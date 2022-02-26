@@ -22,6 +22,7 @@ func ConnectJSON() (*JSONDatabase, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer jsonFile.Close()
 	content, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
 		return nil, err
@@ -33,6 +34,20 @@ func ConnectJSON() (*JSONDatabase, error) {
 	}
 	data := &JSONDatabase{JSONDatabaseStructure: dbStructure}
 	return data, nil
+}
+
+func (j *JSONDatabase) SaveDatabase() error {
+	jsonFile, err := os.Open(filepath.Join("carrotbb", "storage", "database.json"))
+	if err != nil {
+		return err
+	}
+	defer jsonFile.Close()
+	bs, err := json.Marshal(j.JSONDatabaseStructure)
+	if err != nil {
+		return err
+	}
+	_, err = jsonFile.Write(bs)
+	return err
 }
 
 func (j *JSONDatabase) AddPost(content string, categoryID, posterID int) error {
@@ -56,5 +71,9 @@ func (j *JSONDatabase) GetComment(id int) (Comment, error) {
 }
 
 func (j *JSONDatabase) GetUser(id int) (User, error) {
+	return User{}, nil
+}
+
+func (j *JSONDatabase) FindUserByName(name string) (User, error) {
 	return User{}, nil
 }

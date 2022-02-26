@@ -19,6 +19,7 @@ type Database interface {
 	GetPost(id int) (Post, error)
 	GetComment(id int) (Comment, error)
 	GetUser(id int) (User, error)
+	FindUserByName(name string) (User, error)
 }
 
 type Post struct {
@@ -70,6 +71,12 @@ func (db *DBFrontend) AddComment(content string, postID, posterID int) error {
 }
 
 func (db *DBFrontend) AddUser(name, password, signature string) error {
+	if err := IsUsernameValid(name); err != nil {
+		return err
+	}
+	if _, err := db.FindUserByName(name); err == nil {
+		return errors.New("username is taken")
+	}
 	hashedP := HashPassword(name, password)
 	return db.Backend.AddUser(name, hashedP, signature)
 }
@@ -83,5 +90,9 @@ func (db *DBFrontend) GetComment(id int) (Comment, error) {
 }
 
 func (db *DBFrontend) GetUser(id int) (User, error) {
+	return User{}, nil
+}
+
+func (db *DBFrontend) FindUserByName(name string) (User, error) {
 	return User{}, nil
 }
