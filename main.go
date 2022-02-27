@@ -21,7 +21,11 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer db.Disconnect()
+	defer func() {
+		if err := db.Disconnect(); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	http.HandleFunc("/post/", PostPage)
 

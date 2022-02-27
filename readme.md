@@ -15,3 +15,6 @@ which is a interface that handles things such as rules (for usernames, content e
 - json
 - postgresql (planned)
 - sqlite (probably never, but nice to have)
+
+## todo
+- jwt expire list in the database

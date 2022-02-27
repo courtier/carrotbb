@@ -96,14 +96,15 @@ func (j *JSONDatabase) SaveDatabase() error {
 }
 
 func (j *JSONDatabase) Disconnect() error {
-	j.PostsLock.Lock()
-	j.CommentsLock.Lock()
-	j.UsersLock.Lock()
-	defer j.PostsLock.Unlock()
-	defer j.CommentsLock.Unlock()
-	defer j.UsersLock.Unlock()
+	// TODO: there has to be a race condition here fosho
+	// j.PostsLock.Lock()
+	// j.CommentsLock.Lock()
+	// j.UsersLock.Lock()
+	// defer j.PostsLock.Unlock()
+	// defer j.CommentsLock.Unlock()
+	// defer j.UsersLock.Unlock()
 	j.StopSaving <- true
-	return nil
+	return j.SaveDatabase()
 }
 
 func (j *JSONDatabase) AddPost(title, content string, posterID string) error {
