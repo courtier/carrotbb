@@ -56,7 +56,7 @@ func ConnectJSON(folders, filename string, saveInterval time.Duration) (*JSONDat
 	data := &JSONDatabase{
 		JSONDatabaseStructure: dbStructure,
 		SaveTicker:            time.NewTicker(saveInterval),
-		StopSaving:            make(chan bool),
+		StopSaving:            make(chan bool, 1),
 		BackingPath:           path,
 	}
 	go func() {
@@ -95,14 +95,25 @@ func (j *JSONDatabase) SaveDatabase() error {
 	return err
 }
 
-func (j *JSONDatabase) AddPost(content string, posterID string) error {
+func (j *JSONDatabase) Disconnect() error {
+	j.PostsLock.Lock()
+	j.CommentsLock.Lock()
+	j.UsersLock.Lock()
+	defer j.PostsLock.Unlock()
+	defer j.CommentsLock.Unlock()
+	defer j.UsersLock.Unlock()
+	j.StopSaving <- true
+	return nil
+}
+
+func (j *JSONDatabase) AddPost(title, content string, posterID string) error {
 	j.PostsLock.Lock()
 	defer j.PostsLock.Unlock()
 	newP := Post{
+		Title:       title,
 		Content:     content,
 		ID:          xid.New().String(),
 		PosterID:    posterID,
-		CommentIDs:  make([]string, 0),
 		DateCreated: time.Now(),
 	}
 	j.Posts = append(j.Posts, newP)
@@ -120,13 +131,6 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID string) error
 		DateCreated: time.Now(),
 	}
 	j.Comments = append(j.Comments, newC)
-	post, err := j.GetPost(postID)
-	if err != nil {
-		return err
-	}
-	// might be a race condition, might not even need it, just have a function that
-	// searches all comments for postÍD
-	post.CommentIDs = append(post.CommentIDs, newC.ID)
 	return nil
 }
 
@@ -188,14 +192,16 @@ func (j *JSONDatabase) FindUserByName(name string) (*User, error) {
 	return nil, errors.New("no matching user name found")
 }
 
-func (j *JSONDatabase) Disconnect() error {
-	j.PostsLock.Lock()
-	j.CommentsLock.Lock()
-	j.UsersLock.Lock()
-	defer j.PostsLock.Unlock()
-	defer j.CommentsLock.Unlock()
-	defer j.UsersLock.Unlock()
-	j.StopSaving <- true
+func (j *JSONDatabase) AllPosts() ([]Post, error) {
+	return j.Posts, nil
+}
 
-	return nil
+func (j *JSONDatabase) AllCommentsUnderPost(postID string) ([]Comment, error) {
+	cs := []Comment{}
+	for _, c := range j.Comments {
+		if c.PostID == postID {
+			cs = append(cs, c)
+		}
+	}
+	return cs, nil
 }

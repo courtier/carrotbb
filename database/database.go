@@ -13,7 +13,7 @@ const (
 )
 
 type Database interface {
-	AddPost(content string, posterID string) error
+	AddPost(title, content string, posterID string) error
 	AddComment(content string, postID, posterID string) error
 	AddUser(name, password, signature string) error
 
@@ -22,14 +22,17 @@ type Database interface {
 	GetUser(id string) (*User, error)
 	FindUserByName(name string) (*User, error)
 
+	AllPosts() ([]Post, error)
+	AllCommentsUnderPost(postID string) ([]Comment, error)
+
 	Disconnect() error
 }
 
 type Post struct {
+	Title       string
 	Content     string
 	PosterID    string
 	ID          string
-	CommentIDs  []string
 	DateCreated time.Time
 }
 
@@ -55,28 +58,39 @@ type DBFrontend struct {
 
 // Connects to the specified backend
 // args order is db username, password, address, port, db name
-func Connect(backend DatebaseBackends, args ...string) (Database, error) {
+// args order for json is time.Duration for the save interval
+func Connect(backend DatebaseBackends, args ...interface{}) (Database, error) {
+	var db Database
 	switch backend {
 	case JSON:
 		folders := filepath.Join("carrotbb", "storage")
-		js, err := ConnectJSON(folders, "database.json", 5*time.Minute)
+		interval := 5 * time.Minute
+		if len(args) > 0 {
+			interval = args[0].(time.Duration)
+		}
+		js, err := ConnectJSON(folders, "database.json", interval)
 		if err != nil {
 			return nil, err
 		}
-		return &DBFrontend{Backend: js}, nil
+		db = &DBFrontend{Backend: js}
 	default:
 		return nil, errors.New("unsupported database backend")
 	}
+	return db, nil
 }
 
-func (db *DBFrontend) AddPost(content string, posterID string) error {
+func (db *DBFrontend) Disconnect() error {
+	return db.Backend.Disconnect()
+}
+
+func (db *DBFrontend) AddPost(title, content string, posterID string) error {
 	if err := IsContentValid(content); err != nil {
 		return err
 	}
 	if _, err := db.Backend.GetUser(posterID); err != nil {
 		return err
 	}
-	return db.Backend.AddPost(content, posterID)
+	return db.Backend.AddPost(title, content, posterID)
 }
 
 func (db *DBFrontend) AddComment(content string, postID, posterID string) error {
@@ -122,6 +136,10 @@ func (db *DBFrontend) FindUserByName(name string) (*User, error) {
 	return db.Backend.FindUserByName(name)
 }
 
-func (db *DBFrontend) Disconnect() error {
-	return db.Backend.Disconnect()
+func (db *DBFrontend) AllPosts() ([]Post, error) {
+	return db.Backend.AllPosts()
+}
+
+func (db *DBFrontend) AllCommentsUnderPost(postID string) ([]Comment, error) {
+	return db.Backend.AllCommentsUnderPost(postID)
 }
