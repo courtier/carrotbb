@@ -35,6 +35,7 @@ type Post struct {
 	Content     string
 	PosterID    xid.ID
 	ID          xid.ID
+	CommentIDs  []xid.ID
 	DateCreated time.Time
 }
 

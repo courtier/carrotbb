@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/courtier/carrotbb/database"
 	"github.com/rs/xid"
 )
 
@@ -15,17 +16,17 @@ const (
 	DEFAULT_SESSION_EXPIRY = 24 * 7 * time.Hour
 )
 
-type Session struct {
+type session struct {
 	userID xid.ID
 	expiry time.Time
 }
 
-func (s Session) isExpired() bool {
+func (s session) isExpired() bool {
 	return s.expiry.Before(time.Now())
 }
 
 // Will be used for csrf and session tokens
-func NewRandomToken() (string, error) {
+func newRandomToken() (string, error) {
 	b := make([]byte, 8)
 	// We use math/rand here as I think sha256 hashing is
 	// sufficient entropy
@@ -40,14 +41,14 @@ func NewRandomToken() (string, error) {
 }
 
 // Salt and hash the password using the username using sha-256
-func HashPassword(username, password string) string {
+func hashPassword(username, password string) string {
 	h := sha256.New()
 	h.Write([]byte(username))
 	h.Write([]byte(password))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func ExtractSession(r *http.Request) (token string, err error) {
+func extractSession(r *http.Request) (token string, err error) {
 	c, err := r.Cookie("session_token")
 	if err == http.ErrNoCookie {
 		return
@@ -60,12 +61,27 @@ func ExtractSession(r *http.Request) (token string, err error) {
 	return
 }
 
-func IsRequestAuthenticatedSimple(r *http.Request) bool {
-	token, err := ExtractSession(r)
+func isRequestAuthenticatedSimple(r *http.Request) bool {
+	token, err := extractSession(r)
 	if err != nil {
 		return false
 	}
 	return !sessionCache[token].isExpired()
+}
+
+func extractUser(r *http.Request) (user *database.User, err error) {
+	c, err := r.Cookie("session_token")
+	if err == http.ErrNoCookie {
+		return
+	}
+	token := c.Value
+	sesh, ok := sessionCache[token]
+	if !ok {
+		err = errors.New("session not in cache")
+		return
+	}
+	user, err = db.GetUser(sesh.userID)
+	return
 }
 
 type AuthMiddleware struct {
@@ -78,7 +94,7 @@ func NewAuthMiddleware(handler http.Handler) *AuthMiddleware {
 
 // what happens if we just dont refresh and hand out weekly tokens
 func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	token, err := ExtractSession(r)
+	token, err := extractSession(r)
 	if err != nil {
 		a.handler.ServeHTTP(w, r)
 		return
@@ -97,12 +113,12 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handler.ServeHTTP(w, r)
 		return
 	}
-	newToken, err := NewRandomToken()
+	newToken, err := newRandomToken()
 	if err != nil {
 		a.handler.ServeHTTP(w, r)
 		return
 	}
-	sessionCache[newToken] = Session{
+	sessionCache[newToken] = session{
 		userID: sessionCache[token].userID,
 		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
 	}
@@ -118,7 +134,7 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
-	sessionCache[token] = Session{
+	sessionCache[token] = session{
 		userID: userID,
 		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
 	}

@@ -125,6 +125,8 @@ func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, 
 func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.ID, error) {
 	j.CommentsLock.Lock()
 	defer j.CommentsLock.Unlock()
+	j.PostsLock.Lock()
+	defer j.PostsLock.Unlock()
 	newID := xid.New()
 	newC := Comment{
 		Content:     content,
@@ -134,6 +136,11 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.
 		DateCreated: time.Now(),
 	}
 	j.Comments = append(j.Comments, newC)
+	post, err := j.GetPost(postID)
+	if err != nil {
+		return newID, nil
+	}
+	post.CommentIDs = append(post.CommentIDs, newID)
 	return newID, nil
 }
 

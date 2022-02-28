@@ -17,7 +17,7 @@ import (
 
 var (
 	db           database.Database
-	sessionCache = make(map[string]Session)
+	sessionCache = make(map[string]session)
 )
 
 func main() {
@@ -33,8 +33,10 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/post/", PostPage)
 	mux.HandleFunc("/", IndexPage)
+
+	mux.HandleFunc("/createpost", CreatePostHandler)
+	mux.HandleFunc("/post/", PostPage)
 
 	mux.HandleFunc("/signup", SignupHandler)
 	mux.HandleFunc("/signin", SigninHandler)
@@ -59,13 +61,14 @@ func IndexPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Trouble with the database:", err)
 		return
 	}
-	if len(posts) == 0 {
-		fmt.Fprintln(w, "No posts found")
-		return
+	var signedIn bool
+	var username string
+	user, err := extractUser(r)
+	if err == nil {
+		signedIn = true
+		username = user.Name
 	}
-	for _, p := range posts {
-		fmt.Fprintln(w, p.Title)
-	}
+	templates.GenerateIndexPage(w, signedIn, username, posts)
 }
 
 func PostPage(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +83,7 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	if IsRequestAuthenticatedSimple(r) {
+	if isRequestAuthenticatedSimple(r) {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -106,26 +109,26 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, err)
 			return
 		}
-		hashedP := HashPassword(name, password)
+		hashedP := hashPassword(name, password)
 		userID, err := db.AddUser(name, hashedP)
 		if err != nil {
 			fmt.Fprintln(w, err)
 			return
 		}
-		token, err := NewRandomToken()
+		token, err := newRandomToken()
 		if err != nil {
 			fmt.Fprintln(w, "error generating session token", err)
 			return
 		}
 		authenticateUser(w, token, userID)
-		http.Redirect(w, r, "/", 200)
+		http.Redirect(w, r, "/", http.StatusFound)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
 func SigninHandler(w http.ResponseWriter, r *http.Request) {
-	if IsRequestAuthenticatedSimple(r) {
+	if isRequestAuthenticatedSimple(r) {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -139,7 +142,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		name := r.Form.Get("username")
 		password := r.Form.Get("password")
-		hashedP := HashPassword(name, password)
+		hashedP := hashPassword(name, password)
 		user, err := db.FindUserByName(name)
 		if err != nil {
 			fmt.Fprintln(w, err)
@@ -150,7 +153,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "incorrect password")
 			return
 		}
-		token, err := NewRandomToken()
+		token, err := newRandomToken()
 		if err != nil {
 			fmt.Fprintln(w, "error generating session token", err)
 			return
@@ -163,11 +166,11 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	if !IsRequestAuthenticatedSimple(r) {
+	if !isRequestAuthenticatedSimple(r) {
 		http.Redirect(w, r, "/", http.StatusUnauthorized)
 		return
 	}
-	token, err := ExtractSession(r)
+	token, err := extractSession(r)
 	if err != nil {
 		fmt.Println(w, err)
 		return
@@ -178,6 +181,46 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		Value:   "",
 		Expires: time.Now(),
 	})
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
+	if !isRequestAuthenticatedSimple(r) {
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	switch r.Method {
+	case "GET":
+		templates.ServeCreatePostTemplate(w, r)
+	case "POST":
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		title := r.Form.Get("title")
+		content := r.Form.Get("content")
+		if err := isTitleValid(title); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		if err := isContentValid(content); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		user, err := extractUser(r)
+		if err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		postID, err := db.AddPost(title, content, user.ID)
+		if err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 func pathIntoArray(path string) []string {
