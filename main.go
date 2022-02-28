@@ -13,6 +13,7 @@ import (
 
 	"github.com/courtier/carrotbb/database"
 	"github.com/courtier/carrotbb/templates"
+	"github.com/rs/xid"
 )
 
 var (
@@ -37,6 +38,8 @@ func main() {
 
 	mux.HandleFunc("/createpost", CreatePostHandler)
 	mux.HandleFunc("/post/", PostPage)
+
+	mux.HandleFunc("/createcomment", CreateCommentHandler)
 
 	mux.HandleFunc("/signup", SignupHandler)
 	mux.HandleFunc("/signin", SigninHandler)
@@ -78,8 +81,37 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "malformed request path")
 		return
 	}
-	postID := pathSplit[len(pathSplit)-1]
-	log.Println("received post request with id", postID)
+	postIDString := pathSplit[len(pathSplit)-1]
+	postID, err := xid.FromString(postIDString)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	// TODO: with actual database these all could be 1 query
+	post, err := db.GetPost(postID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	comments, err := db.AllCommentsUnderPost(postID)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	poster, err := db.GetUser(post.PosterID)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	var signedIn bool
+	var username string
+	user, err := extractUser(r)
+	if err == nil {
+		signedIn = true
+		username = user.Name
+	}
+	users := db.MapCommentsToUsers(comments)
+	templates.GeneratePostPage(w, signedIn, username, *post, *poster, comments, users)
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
@@ -175,12 +207,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(w, err)
 		return
 	}
-	delete(sessionCache, token)
-	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   "",
-		Expires: time.Now(),
-	})
+	unauthenticateUser(w, token)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
@@ -221,6 +248,43 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+// TODO:
+func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
+	if !isRequestAuthenticatedSimple(r) {
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	title := r.Form.Get("title")
+	content := r.Form.Get("content")
+	if err := isTitleValid(title); err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	if err := isContentValid(content); err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	user, err := extractUser(r)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	postID, err := db.AddPost(title, content, user.ID)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
 }
 
 func pathIntoArray(path string) []string {

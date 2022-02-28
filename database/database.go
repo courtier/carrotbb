@@ -27,6 +27,8 @@ type Database interface {
 	AllPosts() ([]Post, error)
 	AllCommentsUnderPost(postID xid.ID) ([]Comment, error)
 
+	MapCommentsToUsers(comments []Comment) map[Comment]User
+
 	Disconnect() error
 }
 
@@ -57,6 +59,15 @@ type User struct {
 type DBFrontend struct {
 	Backend Database
 }
+
+var (
+	DeletedUser = User{
+		Name:       "Deleted",
+		ID:         xid.NilID(),
+		Password:   "",
+		DateJoined: time.Time{},
+	}
+)
 
 // Connects to the specified backend
 // args order is db username, password, address, port, db name

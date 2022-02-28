@@ -215,3 +215,19 @@ func (j *JSONDatabase) AllCommentsUnderPost(postID xid.ID) ([]Comment, error) {
 	}
 	return cs, nil
 }
+
+// This will always return a map equal length to that of comments
+// If a poster is not found for a comment, it'll put a DeletedUser in its place
+func (j *JSONDatabase) MapCommentsToUsers(comments []Comment) map[Comment]User {
+	m := make(map[Comment]User)
+	for _, c := range comments {
+		user, err := j.GetUser(c.PosterID)
+		if err != nil {
+			// TODO: Ignore error here or return out of the function?
+			m[c] = DeletedUser
+			continue
+		}
+		m[c] = *user
+	}
+	return m
+}

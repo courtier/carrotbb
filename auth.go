@@ -102,9 +102,11 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if sessionCache[token].isExpired() {
 		delete(sessionCache, token)
 		http.SetCookie(w, &http.Cookie{
-			Name:    "session_token",
-			Value:   "",
-			Expires: time.Now(),
+			Name:     "session_token",
+			Value:    "",
+			Expires:  time.Now(),
+			HttpOnly: true,
+			Path:     "/",
 		})
 		a.handler.ServeHTTP(w, r)
 		return
@@ -123,9 +125,11 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   newToken,
-		Expires: time.Now().Add(DEFAULT_SESSION_EXPIRY),
+		Name:     "session_token",
+		Value:    newToken,
+		Expires:  time.Now().Add(DEFAULT_SESSION_EXPIRY),
+		HttpOnly: true,
+		Path:     "/",
 	})
 	a.handler.ServeHTTP(w, r)
 	// delete token after this serving this request as to not mess up
@@ -139,8 +143,21 @@ func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
 		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   token,
-		Expires: time.Now().Add(DEFAULT_SESSION_EXPIRY),
+		Name:     "session_token",
+		Value:    token,
+		Expires:  time.Now().Add(DEFAULT_SESSION_EXPIRY),
+		HttpOnly: true,
+		Path:     "/",
+	})
+}
+
+func unauthenticateUser(w http.ResponseWriter, token string) {
+	delete(sessionCache, token)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Expires:  time.Now(),
+		HttpOnly: true,
+		Path:     "/",
 	})
 }
