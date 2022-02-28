@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,9 +12,13 @@ import (
 	"time"
 
 	"github.com/courtier/carrotbb/database"
+	"github.com/courtier/carrotbb/templates"
 )
 
-var db database.Database
+var (
+	db           database.Database
+	sessionCache = make(map[string]Session)
+)
 
 func main() {
 	var err error
@@ -27,26 +32,28 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/post/", PostPage)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/post/", PostPage)
+	mux.HandleFunc("/", IndexPage)
 
-	http.HandleFunc("/signin", IndexPage)
-	http.HandleFunc("/signup", IndexPage)
+	mux.HandleFunc("/signup", SignupHandler)
+	mux.HandleFunc("/signin", SigninHandler)
+	mux.HandleFunc("/logout", LogoutHandler)
 
-	http.HandleFunc("/", IndexPage)
+	auther := NewAuthMiddleware(mux)
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
 		log.Println("listening on port :8080")
-		log.Fatal(http.ListenAndServe(":8080", nil))
+		log.Fatal(http.ListenAndServe(":8080", auther))
 	}()
 
 	<-terminate
 }
 
 func IndexPage(w http.ResponseWriter, r *http.Request) {
-	log.Println("received index request")
 	posts, err := db.AllPosts()
 	if err != nil {
 		fmt.Fprintln(w, "Trouble with the database:", err)
@@ -70,18 +77,107 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 	}
 	postID := pathSplit[len(pathSplit)-1]
 	log.Println("received post request with id", postID)
-	posts, err := db.AllPosts()
+}
+
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+	if IsRequestAuthenticatedSimple(r) {
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	switch r.Method {
+	case "GET":
+		templates.ServeSignupTemplate(w, r)
+	case "POST":
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		name := r.Form.Get("username")
+		password := r.Form.Get("password")
+		if err := isUsernameValid(name); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		if _, err := db.FindUserByName(name); err == nil {
+			fmt.Fprintln(w, errors.New("username is taken"))
+			return
+		}
+		if err := isPasswordValid(password); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		hashedP := HashPassword(name, password)
+		userID, err := db.AddUser(name, hashedP)
+		if err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		token, err := NewRandomToken()
+		if err != nil {
+			fmt.Fprintln(w, "error generating session token", err)
+			return
+		}
+		authenticateUser(w, token, userID)
+		http.Redirect(w, r, "/", 200)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func SigninHandler(w http.ResponseWriter, r *http.Request) {
+	if IsRequestAuthenticatedSimple(r) {
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	switch r.Method {
+	case "GET":
+		templates.ServeSigninTemplate(w, r)
+	case "POST":
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		name := r.Form.Get("username")
+		password := r.Form.Get("password")
+		hashedP := HashPassword(name, password)
+		user, err := db.FindUserByName(name)
+		if err != nil {
+			fmt.Fprintln(w, err)
+			return
+		}
+		if user.Password != hashedP {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintln(w, "incorrect password")
+			return
+		}
+		token, err := NewRandomToken()
+		if err != nil {
+			fmt.Fprintln(w, "error generating session token", err)
+			return
+		}
+		authenticateUser(w, token, user.ID)
+		http.Redirect(w, r, "/", http.StatusFound)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsRequestAuthenticatedSimple(r) {
+		http.Redirect(w, r, "/", http.StatusUnauthorized)
+		return
+	}
+	token, err := ExtractSession(r)
 	if err != nil {
-		fmt.Fprintln(w, "Trouble with the database:", err)
+		fmt.Println(w, err)
 		return
 	}
-	if len(posts) == 0 {
-		fmt.Fprintln(w, "No posts found")
-		return
-	}
-	for _, p := range posts {
-		fmt.Fprintln(w, p.Title)
-	}
+	delete(sessionCache, token)
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   "",
+		Expires: time.Now(),
+	})
 }
 
 func pathIntoArray(path string) []string {

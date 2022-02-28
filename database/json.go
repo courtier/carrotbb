@@ -107,49 +107,51 @@ func (j *JSONDatabase) Disconnect() error {
 	return j.SaveDatabase()
 }
 
-func (j *JSONDatabase) AddPost(title, content string, posterID string) error {
+func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, error) {
 	j.PostsLock.Lock()
 	defer j.PostsLock.Unlock()
+	newID := xid.New()
 	newP := Post{
 		Title:       title,
 		Content:     content,
-		ID:          xid.New().String(),
+		ID:          newID,
 		PosterID:    posterID,
 		DateCreated: time.Now(),
 	}
 	j.Posts = append(j.Posts, newP)
-	return nil
+	return newID, nil
 }
 
-func (j *JSONDatabase) AddComment(content string, postID, posterID string) error {
+func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.ID, error) {
 	j.CommentsLock.Lock()
 	defer j.CommentsLock.Unlock()
+	newID := xid.New()
 	newC := Comment{
 		Content:     content,
-		ID:          xid.New().String(),
+		ID:          newID,
 		PosterID:    posterID,
 		PostID:      postID,
 		DateCreated: time.Now(),
 	}
 	j.Comments = append(j.Comments, newC)
-	return nil
+	return newID, nil
 }
 
-func (j *JSONDatabase) AddUser(name, password, signature string) error {
+func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
 	j.UsersLock.Lock()
 	defer j.UsersLock.Unlock()
+	newID := xid.New()
 	newU := User{
 		Name:       name,
-		Signature:  signature,
-		ID:         xid.New().String(),
+		ID:         newID,
 		Password:   password,
 		DateJoined: time.Now(),
 	}
 	j.Users = append(j.Users, newU)
-	return nil
+	return newID, nil
 }
 
-func (j *JSONDatabase) GetPost(id string) (*Post, error) {
+func (j *JSONDatabase) GetPost(id xid.ID) (*Post, error) {
 	j.PostsLock.RLock()
 	defer j.PostsLock.RUnlock()
 	for _, p := range j.Posts {
@@ -160,7 +162,7 @@ func (j *JSONDatabase) GetPost(id string) (*Post, error) {
 	return nil, errors.New("no matching post id found")
 }
 
-func (j *JSONDatabase) GetComment(id string) (*Comment, error) {
+func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
 	j.CommentsLock.RLock()
 	defer j.CommentsLock.RUnlock()
 	for _, c := range j.Comments {
@@ -171,7 +173,7 @@ func (j *JSONDatabase) GetComment(id string) (*Comment, error) {
 	return nil, errors.New("no matching comment id found")
 }
 
-func (j *JSONDatabase) GetUser(id string) (*User, error) {
+func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
 	j.UsersLock.RLock()
 	defer j.UsersLock.RUnlock()
 	for _, u := range j.Users {
@@ -197,7 +199,7 @@ func (j *JSONDatabase) AllPosts() ([]Post, error) {
 	return j.Posts, nil
 }
 
-func (j *JSONDatabase) AllCommentsUnderPost(postID string) ([]Comment, error) {
+func (j *JSONDatabase) AllCommentsUnderPost(postID xid.ID) ([]Comment, error) {
 	cs := []Comment{}
 	for _, c := range j.Comments {
 		if c.PostID == postID {

@@ -13,7 +13,7 @@ func TestConnectJSON(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	if err = j.AddUser("courtier", "courtier", "hello!"); err != nil {
+	if _, err = j.AddUser("courtier", "courtier"); err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
