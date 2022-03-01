@@ -22,13 +22,13 @@ const postPageTemplateStr = `<html lang="en">
     {{else}}
     <p><a href="/">carrotbb</a> - <a href="/signup">sign up</a> <a href="/signin">sign in</a></p>
     {{end}}
-    <p><b>{{.Poster.Name}}</b> posted posted at {{.Post.DateCreated.Format "15:04:05 UTC"}} on {{.Post.DateCreated.Format "Jan 02, 2006"}}:</p>
+    <p><b>{{.Poster.Name}}</b> posted at {{.Post.DateCreated.Format "15:04:05 UTC"}} on {{.Post.DateCreated.Format "Jan 02, 2006"}}:</p>
 	<h2>{{.Post.Title}}</h2>
     <p>{{.Post.Content}}</p>
     <hr>
     {{if .Comments}}
-        {{range $comment := .Comments}}
-			<p><b>{{index .Users $comment }}</b>posted at {{.DateCreated.Format "15:04:05 UTC"}} on {{.DateCreated.Format "Jan 02, 2006"}}<br>
+        {{range $comment, $user := .Comments}}
+			<p><b>{{$user.Name}}</b> commented at {{$comment.DateCreated.Format "15:04:05 UTC"}} on {{$comment.DateCreated.Format "Jan 02, 2006"}}<br>
                 {{$comment.Content}}</p>
             <hr>
         {{end}}
@@ -52,22 +52,20 @@ type PostPageTemplateData struct {
 	Username string
 	Post     database.Post
 	Poster   database.User
-	Comments []database.Comment
-	Users    map[database.Comment]database.User
+	Comments map[database.Comment]database.User
 }
 
 var (
 	postPageTemplate = template.Must(template.New("postPageTemplate").Parse(postPageTemplateStr))
 )
 
-func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post database.Post, poster database.User, comments []database.Comment, users map[database.Comment]database.User) error {
+func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post database.Post, poster database.User, comments map[database.Comment]database.User) error {
 	data := PostPageTemplateData{
 		SignedIn: signedIn,
 		Username: name,
 		Post:     post,
 		Poster:   poster,
 		Comments: comments,
-		Users:    users,
 	}
 	return postPageTemplate.Execute(w, data)
 }

@@ -84,6 +84,17 @@ func extractUser(r *http.Request) (user *database.User, err error) {
 	return
 }
 
+func extractUsername(r *http.Request) (bool, string) {
+	var signedIn bool
+	var username string
+	user, err := extractUser(r)
+	if err == nil {
+		signedIn = true
+		username = user.Name
+	}
+	return signedIn, username
+}
+
 type AuthMiddleware struct {
 	handler http.Handler
 }

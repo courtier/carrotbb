@@ -25,9 +25,9 @@ type Database interface {
 	FindUserByName(name string) (*User, error)
 
 	AllPosts() ([]Post, error)
-	AllCommentsUnderPost(postID xid.ID) ([]Comment, error)
 
-	MapCommentsToUsers(comments []Comment) map[Comment]User
+	// TODO: with actual database these all could be 1 query
+	GetPostPageData(postID xid.ID) (Post, User, map[Comment]User, error)
 
 	Disconnect() error
 }

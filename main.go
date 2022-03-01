@@ -61,57 +61,34 @@ func main() {
 func IndexPage(w http.ResponseWriter, r *http.Request) {
 	posts, err := db.AllPosts()
 	if err != nil {
-		fmt.Fprintln(w, "Trouble with the database:", err)
+		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
-	var signedIn bool
-	var username string
-	user, err := extractUser(r)
-	if err == nil {
-		signedIn = true
-		username = user.Name
-	}
+	signedIn, username := extractUsername(r)
 	templates.GenerateIndexPage(w, signedIn, username, posts)
 }
 
 func PostPage(w http.ResponseWriter, r *http.Request) {
 	pathSplit := pathIntoArray(r.URL.EscapedPath())
-	if pathSplit[len(pathSplit)-2] != "post" {
+	if len(pathSplit) != 2 || pathSplit[0] != "post" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, "malformed request path")
+		templates.GenerateErrorPage(w, "malformed request path")
 		return
 	}
-	postIDString := pathSplit[len(pathSplit)-1]
-	postID, err := xid.FromString(postIDString)
+	postID, err := xid.FromString(pathSplit[1])
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		templates.GenerateErrorPage(w, "malformed post id")
+		return
+	}
+	post, poster, comments, err := db.GetPostPageData(postID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
+		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
-	// TODO: with actual database these all could be 1 query
-	post, err := db.GetPost(postID)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	comments, err := db.AllCommentsUnderPost(postID)
-	if err != nil {
-		fmt.Fprintln(w, err)
-		return
-	}
-	poster, err := db.GetUser(post.PosterID)
-	if err != nil {
-		fmt.Fprintln(w, err)
-		return
-	}
-	var signedIn bool
-	var username string
-	user, err := extractUser(r)
-	if err == nil {
-		signedIn = true
-		username = user.Name
-	}
-	users := db.MapCommentsToUsers(comments)
-	templates.GeneratePostPage(w, signedIn, username, *post, *poster, comments, users)
+	signedIn, username := extractUsername(r)
+	templates.GeneratePostPage(w, signedIn, username, post, poster, comments)
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +174,8 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TODO: if the session cookie is old and is not in cache
+// and we log in again, this will return unauthorized
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if !isRequestAuthenticatedSimple(r) {
 		http.Redirect(w, r, "/", http.StatusUnauthorized)
@@ -264,12 +243,8 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, err)
 		return
 	}
-	title := r.Form.Get("title")
-	content := r.Form.Get("content")
-	if err := isTitleValid(title); err != nil {
-		fmt.Fprintln(w, err)
-		return
-	}
+	postIDString := r.Form.Get("postID")
+	content := r.Form.Get("comment")
 	if err := isContentValid(content); err != nil {
 		fmt.Fprintln(w, err)
 		return
@@ -279,7 +254,12 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, err)
 		return
 	}
-	postID, err := db.AddPost(title, content, user.ID)
+	postID, err := xid.FromString(postIDString)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	_, err = db.AddComment(content, postID, user.ID)
 	if err != nil {
 		fmt.Fprintln(w, err)
 		return

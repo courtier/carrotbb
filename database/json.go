@@ -117,6 +117,7 @@ func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, 
 		ID:          newID,
 		PosterID:    posterID,
 		DateCreated: time.Now(),
+		CommentIDs:  []xid.ID{},
 	}
 	j.Posts = append(j.Posts, newP)
 	return newID, nil
@@ -125,8 +126,6 @@ func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, 
 func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.ID, error) {
 	j.CommentsLock.Lock()
 	defer j.CommentsLock.Unlock()
-	j.PostsLock.Lock()
-	defer j.PostsLock.Unlock()
 	newID := xid.New()
 	newC := Comment{
 		Content:     content,
@@ -136,8 +135,10 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.
 		DateCreated: time.Now(),
 	}
 	j.Comments = append(j.Comments, newC)
+	// TODO: this is probably a race condition
 	post, err := j.GetPost(postID)
 	if err != nil {
+		log.Println("this is impossible")
 		return newID, nil
 	}
 	post.CommentIDs = append(post.CommentIDs, newID)
@@ -161,9 +162,9 @@ func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
 func (j *JSONDatabase) GetPost(id xid.ID) (*Post, error) {
 	j.PostsLock.RLock()
 	defer j.PostsLock.RUnlock()
-	for _, p := range j.Posts {
-		if p.ID == id {
-			return &p, nil
+	for n := range j.Posts {
+		if j.Posts[n].ID == id {
+			return &j.Posts[n], nil
 		}
 	}
 	return nil, errors.New("no matching post id found")
@@ -172,9 +173,9 @@ func (j *JSONDatabase) GetPost(id xid.ID) (*Post, error) {
 func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
 	j.CommentsLock.RLock()
 	defer j.CommentsLock.RUnlock()
-	for _, c := range j.Comments {
-		if c.ID == id {
-			return &c, nil
+	for n := range j.Comments {
+		if j.Comments[n].ID == id {
+			return &j.Comments[n], nil
 		}
 	}
 	return nil, errors.New("no matching comment id found")
@@ -183,9 +184,9 @@ func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
 func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
 	j.UsersLock.RLock()
 	defer j.UsersLock.RUnlock()
-	for _, u := range j.Users {
-		if u.ID == id {
-			return &u, nil
+	for n := range j.Users {
+		if j.Users[n].ID == id {
+			return &j.Users[n], nil
 		}
 	}
 	return nil, errors.New("no matching user id found")
@@ -194,9 +195,9 @@ func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
 func (j *JSONDatabase) FindUserByName(name string) (*User, error) {
 	j.UsersLock.RLock()
 	defer j.UsersLock.RUnlock()
-	for _, u := range j.Users {
-		if u.Name == name {
-			return &u, nil
+	for n := range j.Users {
+		if j.Users[n].Name == name {
+			return &j.Users[n], nil
 		}
 	}
 	return nil, errors.New("no matching user name found")
@@ -216,18 +217,30 @@ func (j *JSONDatabase) AllCommentsUnderPost(postID xid.ID) ([]Comment, error) {
 	return cs, nil
 }
 
-// This will always return a map equal length to that of comments
-// If a poster is not found for a comment, it'll put a DeletedUser in its place
-func (j *JSONDatabase) MapCommentsToUsers(comments []Comment) map[Comment]User {
-	m := make(map[Comment]User)
-	for _, c := range comments {
-		user, err := j.GetUser(c.PosterID)
+func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, comments map[Comment]User, err error) {
+	postP, err := j.GetPost(postID)
+	if err != nil {
+		return
+	}
+	post = *postP
+	posterP, err := j.GetUser(post.PosterID)
+	if err != nil {
+		return
+	}
+	poster = *posterP
+	comments = make(map[Comment]User)
+	for _, cID := range post.CommentIDs {
+		commentP, err := j.GetComment(cID)
 		if err != nil {
 			// TODO: Ignore error here or return out of the function?
-			m[c] = DeletedUser
 			continue
 		}
-		m[c] = *user
+		commenterP, err := j.GetUser(commentP.PosterID)
+		if err != nil {
+			comments[*commentP] = DeletedUser
+			continue
+		}
+		comments[*commentP] = *commenterP
 	}
-	return m
+	return
 }
