@@ -16,6 +16,11 @@ const (
 	DEFAULT_SESSION_EXPIRY = 24 * 7 * time.Hour
 )
 
+var (
+	ErrSessionNotCached  = errors.New("session not in cache")
+	ErrRandReadUnmatched = errors.New("rand read less bytes than required")
+)
+
 type session struct {
 	userID xid.ID
 	expiry time.Time
@@ -31,11 +36,11 @@ func newRandomToken() (string, error) {
 	// We use math/rand here as I think sha256 hashing is
 	// sufficient entropy
 	n, err := rand.Read(b)
-	if n != len(b) {
-		return "", errors.New("rand read less bytes than required")
-	}
 	if err != nil {
 		return "", err
+	}
+	if n != len(b) {
+		return "", ErrRandReadUnmatched
 	}
 	return hex.EncodeToString(sha256.New().Sum(b)), nil
 }
@@ -56,7 +61,7 @@ func extractSession(r *http.Request) (token string, err error) {
 	token = c.Value
 	_, ok := sessionCache[token]
 	if !ok {
-		err = errors.New("session not in cache")
+		err = ErrSessionNotCached
 	}
 	return
 }
@@ -77,7 +82,7 @@ func extractUser(r *http.Request) (user *database.User, err error) {
 	token := c.Value
 	sesh, ok := sessionCache[token]
 	if !ok {
-		err = errors.New("session not in cache")
+		err = ErrSessionNotCached
 		return
 	}
 	user, err = db.GetUser(sesh.userID)

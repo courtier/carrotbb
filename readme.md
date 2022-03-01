@@ -13,8 +13,6 @@ bulletin board
 
 ## immediate todos
 - postgresql backend
-- error page template
-- move all errors.New into global declarations, making them comparable
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
 - return to referer once logged in
@@ -25,6 +23,7 @@ bulletin board
 - store session token hashes in database
 - more tests
 - css
+- logging
 
 ## nice to haves for the future
 - image embeds

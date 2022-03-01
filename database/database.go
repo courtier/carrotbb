@@ -14,6 +14,14 @@ const (
 	JSON DatebaseBackends = iota
 )
 
+var (
+	ErrUnsupportedDatabaseBackend = errors.New("unsupported database backend")
+	ErrNoPostFoundByID            = errors.New("no matching post id found")
+	ErrNoCommentFoundByID         = errors.New("no matching comment id found")
+	ErrNoUserFoundByID            = errors.New("no matching user id found")
+	ErrUsernameNotFound           = errors.New("no matching user name found")
+)
+
 type Database interface {
 	AddPost(title, content string, posterID xid.ID) (xid.ID, error)
 	AddComment(content string, postID, posterID xid.ID) (xid.ID, error)
@@ -87,7 +95,7 @@ func Connect(backend DatebaseBackends, args ...interface{}) (Database, error) {
 		}
 		db = js
 	default:
-		return nil, errors.New("unsupported database backend")
+		return nil, ErrUnsupportedDatabaseBackend
 	}
 	return db, nil
 }

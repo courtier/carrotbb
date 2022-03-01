@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -61,6 +59,7 @@ func main() {
 func IndexPage(w http.ResponseWriter, r *http.Request) {
 	posts, err := db.AllPosts()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
@@ -84,7 +83,8 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 	post, poster, comments, err := db.GetPostPageData(postID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		templates.GenerateErrorPage(w, err.Error())
+		templates.GenerateErrorPage(w, "error while fetching the post")
+		log.Println(err)
 		return
 	}
 	signedIn, username := extractUsername(r)
@@ -101,32 +101,41 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		templates.ServeSignupTemplate(w, r)
 	case "POST":
 		if err := r.ParseForm(); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, "error parsing form")
+			log.Println(err)
 			return
 		}
 		name := r.Form.Get("username")
 		password := r.Form.Get("password")
 		if err := isUsernameValid(name); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
 		if _, err := db.FindUserByName(name); err == nil {
-			fmt.Fprintln(w, errors.New("username is taken"))
+			w.WriteHeader(http.StatusConflict)
+			templates.GenerateErrorPage(w, "username is taken")
 			return
 		}
 		if err := isPasswordValid(password); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
 		hashedP := hashPassword(name, password)
 		userID, err := db.AddUser(name, hashedP)
 		if err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			templates.GenerateErrorPage(w, "error during signup")
+			log.Println(err)
 			return
 		}
 		token, err := newRandomToken()
 		if err != nil {
-			fmt.Fprintln(w, "error generating session token", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			templates.GenerateErrorPage(w, "error generating session token")
+			log.Println(err)
 			return
 		}
 		authenticateUser(w, token, userID)
@@ -146,7 +155,9 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		templates.ServeSigninTemplate(w, r)
 	case "POST":
 		if err := r.ParseForm(); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, "error parsing form")
+			log.Println(err)
 			return
 		}
 		name := r.Form.Get("username")
@@ -154,17 +165,25 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		hashedP := hashPassword(name, password)
 		user, err := db.FindUserByName(name)
 		if err != nil {
-			fmt.Fprintln(w, err)
+			if err == database.ErrUsernameNotFound {
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			templates.GenerateErrorPage(w, "error finding that username")
+			log.Println(err)
 			return
 		}
 		if user.Password != hashedP {
 			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintln(w, "incorrect password")
+			templates.GenerateErrorPage(w, "incorrect password")
 			return
 		}
 		token, err := newRandomToken()
 		if err != nil {
-			fmt.Fprintln(w, "error generating session token", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			templates.GenerateErrorPage(w, "error generating session token")
+			log.Println(err)
 			return
 		}
 		authenticateUser(w, token, user.ID)
@@ -183,7 +202,9 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	token, err := extractSession(r)
 	if err != nil {
-		fmt.Println(w, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		templates.GenerateErrorPage(w, "error logging out")
+		log.Println(err)
 		return
 	}
 	unauthenticateUser(w, token)
@@ -200,27 +221,35 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		templates.ServeCreatePostTemplate(w, r)
 	case "POST":
 		if err := r.ParseForm(); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, "error parsing form")
+			log.Println(err)
 			return
 		}
 		title := r.Form.Get("title")
 		content := r.Form.Get("content")
 		if err := isTitleValid(title); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
 		if err := isContentValid(content); err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
 		user, err := extractUser(r)
 		if err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			templates.GenerateErrorPage(w, "error extracting user")
+			log.Println(err)
 			return
 		}
 		postID, err := db.AddPost(title, content, user.ID)
 		if err != nil {
-			fmt.Fprintln(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			templates.GenerateErrorPage(w, "error creating post")
+			log.Println(err)
 			return
 		}
 		http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
@@ -229,7 +258,6 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO:
 func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if !isRequestAuthenticatedSimple(r) {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
@@ -240,28 +268,36 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		fmt.Fprintln(w, err)
+		w.WriteHeader(http.StatusBadRequest)
+		templates.GenerateErrorPage(w, "error parsing form")
+		log.Println(err)
 		return
 	}
 	postIDString := r.Form.Get("postID")
+	postID, err := xid.FromString(postIDString)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		templates.GenerateErrorPage(w, "malformed post id")
+		return
+	}
 	content := r.Form.Get("comment")
 	if err := isContentValid(content); err != nil {
-		fmt.Fprintln(w, err)
+		w.WriteHeader(http.StatusBadRequest)
+		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
 	user, err := extractUser(r)
 	if err != nil {
-		fmt.Fprintln(w, err)
-		return
-	}
-	postID, err := xid.FromString(postIDString)
-	if err != nil {
-		fmt.Fprintln(w, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		templates.GenerateErrorPage(w, "error extracting user")
+		log.Println(err)
 		return
 	}
 	_, err = db.AddComment(content, postID, user.ID)
 	if err != nil {
-		fmt.Fprintln(w, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		templates.GenerateErrorPage(w, "error creating comment")
+		log.Println(err)
 		return
 	}
 	http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)

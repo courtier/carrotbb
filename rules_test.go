@@ -4,9 +4,9 @@ import "testing"
 
 func TestIsUsernameValid(t *testing.T) {
 	payloads := map[string]error{
-		"":                          ErrNameTooShort,
+		"":                          ErrNameBadLength,
 		"hello":                     nil,
-		"hellohellohellohellohello": ErrNameTooLong,
+		"hellohellohellohellohello": ErrNameBadLength,
 		"....":                      ErrNameBadCharacter,
 	}
 	for k, v := range payloads {

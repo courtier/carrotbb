@@ -17,7 +17,7 @@ const errorPageTemplateStr = `<html lang="en">
 
 <body>
     <p><a href="/">carrotbb</a> - you've just run into an error!</p>
-	<h4>no posts found.</h4>
+	<h4>{{.Error}}</h4>
 </body>
 
 </html>`

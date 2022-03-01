@@ -2,7 +2,6 @@ package database
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -138,8 +137,7 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.
 	// TODO: this is probably a race condition
 	post, err := j.GetPost(postID)
 	if err != nil {
-		log.Println("this is impossible")
-		return newID, nil
+		return newID, err
 	}
 	post.CommentIDs = append(post.CommentIDs, newID)
 	return newID, nil
@@ -167,7 +165,7 @@ func (j *JSONDatabase) GetPost(id xid.ID) (*Post, error) {
 			return &j.Posts[n], nil
 		}
 	}
-	return nil, errors.New("no matching post id found")
+	return nil, ErrNoPostFoundByID
 }
 
 func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
@@ -178,7 +176,7 @@ func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
 			return &j.Comments[n], nil
 		}
 	}
-	return nil, errors.New("no matching comment id found")
+	return nil, ErrNoCommentFoundByID
 }
 
 func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
@@ -189,7 +187,7 @@ func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
 			return &j.Users[n], nil
 		}
 	}
-	return nil, errors.New("no matching user id found")
+	return nil, ErrNoUserFoundByID
 }
 
 func (j *JSONDatabase) FindUserByName(name string) (*User, error) {
@@ -200,7 +198,7 @@ func (j *JSONDatabase) FindUserByName(name string) (*User, error) {
 			return &j.Users[n], nil
 		}
 	}
-	return nil, errors.New("no matching user name found")
+	return nil, ErrUsernameNotFound
 }
 
 func (j *JSONDatabase) AllPosts() ([]Post, error) {
