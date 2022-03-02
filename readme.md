@@ -7,7 +7,7 @@ bulletin board
 - extensive test coverage
 - explanatory comments
 - multiple database backends with a shared interface
-    - supported: json (very slow, prototyping only)
+    - supported: json (very slow, for prototyping only)
     - planned: postgresql
     - nice to have: mongodb, sqlite
 
@@ -16,11 +16,12 @@ bulletin board
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
 - return to referer once logged in
-- stop refreshing sessions on every request
+- store session token hashes in database
+- config file
+    - store json db backing file, postgres user, port, ssl cert folder etc.
 
 ## long term todos
 - csrf tokens
-- store session token hashes in database
 - more tests
 - css
 - logging
