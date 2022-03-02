@@ -74,7 +74,7 @@ func isRequestAuthenticatedSimple(r *http.Request) bool {
 	return !sessionCache[token].isExpired()
 }
 
-func extractUser(r *http.Request) (user *database.User, err error) {
+func extractUser(r *http.Request) (user database.User, err error) {
 	c, err := r.Cookie("session_token")
 	if err == http.ErrNoCookie {
 		return
@@ -85,8 +85,7 @@ func extractUser(r *http.Request) (user *database.User, err error) {
 		err = ErrSessionNotCached
 		return
 	}
-	user, err = db.GetUser(sesh.userID)
-	return
+	return db.GetUser(sesh.userID)
 }
 
 func extractUsername(r *http.Request) (bool, string) {
@@ -111,46 +110,10 @@ func NewAuthMiddleware(handler http.Handler) *AuthMiddleware {
 // what happens if we just dont refresh and hand out weekly tokens
 func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token, err := extractSession(r)
-	if err != nil {
-		a.handler.ServeHTTP(w, r)
-		return
+	if err == nil && sessionCache[token].isExpired() {
+		unauthenticateUser(w, token)
 	}
-	if sessionCache[token].isExpired() {
-		delete(sessionCache, token)
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    "",
-			Expires:  time.Now(),
-			HttpOnly: true,
-			Path:     "/",
-		})
-		a.handler.ServeHTTP(w, r)
-		return
-	}
-	if r.URL.EscapedPath() == "/logout" {
-		a.handler.ServeHTTP(w, r)
-		return
-	}
-	newToken, err := newRandomToken()
-	if err != nil {
-		a.handler.ServeHTTP(w, r)
-		return
-	}
-	sessionCache[newToken] = session{
-		userID: sessionCache[token].userID,
-		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    newToken,
-		Expires:  time.Now().Add(DEFAULT_SESSION_EXPIRY),
-		HttpOnly: true,
-		Path:     "/",
-	})
 	a.handler.ServeHTTP(w, r)
-	// delete token after this serving this request as to not mess up
-	// the authentication for the duration of this request
-	delete(sessionCache, token)
 }
 
 func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
