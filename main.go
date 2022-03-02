@@ -134,7 +134,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
-		hashedP := hashPassword(name, password)
+		hashedP := saltAndHash(password, name)
 		userID, err := db.AddUser(name, hashedP)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -173,7 +173,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		name := r.Form.Get("username")
 		password := r.Form.Get("password")
-		hashedP := hashPassword(name, password)
+		hashedP := saltAndHash(password, name)
 		user, err := db.FindUserByName(name)
 		if err != nil {
 			if err == database.ErrUsernameNotFound {
@@ -185,7 +185,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		if user.Password != hashedP {
+		if hashedP != user.Password {
 			w.WriteHeader(http.StatusUnauthorized)
 			templates.GenerateErrorPage(w, "incorrect password")
 			return

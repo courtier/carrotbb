@@ -2,14 +2,17 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"time"
 
 	"github.com/courtier/carrotbb/database"
 	"github.com/rs/xid"
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -45,12 +48,20 @@ func newRandomToken() (string, error) {
 	return hex.EncodeToString(sha256.New().Sum(b)), nil
 }
 
-// Salt and hash the password using the username using sha-256
-func hashPassword(username, password string) string {
-	h := sha256.New()
-	h.Write([]byte(username))
-	h.Write([]byte(password))
-	return hex.EncodeToString(h.Sum(nil))
+const (
+	argonTime    = 4
+	argonMemory  = 16 * 1024
+	argonThreads = 4
+	argonKeyLen  = 32
+)
+
+// Salt and hash initial using argon2
+func saltAndHash(initial, salt string) string {
+	key := argon2.IDKey([]byte(initial), []byte(salt), argonTime, argonMemory, argonThreads, argonKeyLen)
+	basedKey := base64.RawStdEncoding.EncodeToString(key)
+	basedSalt := base64.RawStdEncoding.EncodeToString([]byte(salt))
+	encoded := fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, argonMemory, argonTime, argonThreads, basedKey, basedSalt)
+	return encoded
 }
 
 func extractSession(r *http.Request) (token string, err error) {

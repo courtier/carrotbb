@@ -2,12 +2,45 @@ package database
 
 import (
 	"context"
+	"log"
 	"os"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/rs/xid"
 )
+
+const CREATE_POSTS_TABLE = `CREATE TABLE IF NOT EXISTS posts (
+	title			text,
+	content			text,
+	poster_id		bytea,
+	id				bytea,
+	comment_ids		bytea[],
+	date_created	timestamp
+);`
+
+const CREATE_COMMENTS_TABLE = `CREATE TABLE IF NOT EXISTS comments (
+	content			text,
+	post_id			bytea,
+	poster_id		bytea,
+	id				bytea,
+	date_created	timestamp
+);`
+
+const CREATE_USERS_TABLE = `CREATE TABLE IF NOT EXISTS users (
+	name			text,
+	id				bytea,
+	password		text,
+	date_joined		timestamp
+);`
+
+const CREATE_SESSIONS_TABLE = `CREATE TABLE IF NOT EXISTS sessions (
+	hash			bytea,
+	user_id			bytea,
+	expiry			timestamp
+);`
+
+var createTables = []string{CREATE_POSTS_TABLE, CREATE_COMMENTS_TABLE, CREATE_USERS_TABLE, CREATE_SESSIONS_TABLE}
 
 type PostgresDatabase struct {
 	pool *pgxpool.Pool
@@ -19,7 +52,13 @@ func ConnectPostgres() (db *PostgresDatabase, err error) {
 		return nil, err
 	}
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		// create tables IF NOT EXIST here
+		for _, statement := range createTables {
+			_, err := conn.Exec(ctx, statement)
+			if err != nil {
+				log.Fatalln(err)
+				return err
+			}
+		}
 		return nil
 	}
 	pool, err := pgxpool.ConnectConfig(context.Background(), config)

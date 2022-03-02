@@ -19,6 +19,7 @@ bulletin board
 - store session token hashes in database
 - config file
     - store json db backing file, postgres user, port, ssl cert folder etc.
+- convert password and session hashes to scrypt
 
 ## long term todos
 - csrf tokens
