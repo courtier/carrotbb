@@ -2,16 +2,14 @@ package database
 
 import (
 	"errors"
-	"path/filepath"
 	"time"
 
 	"github.com/rs/xid"
 )
 
-type DatebaseBackends int
-
 const (
-	JSON DatebaseBackends = iota
+	JSON     string = "json"
+	Postgres string = "postgres"
 )
 
 var (
@@ -27,10 +25,10 @@ type Database interface {
 	AddComment(content string, postID, posterID xid.ID) (xid.ID, error)
 	AddUser(name, password string) (xid.ID, error)
 
-	GetPost(id xid.ID) (*Post, error)
-	GetComment(id xid.ID) (*Comment, error)
-	GetUser(id xid.ID) (*User, error)
-	FindUserByName(name string) (*User, error)
+	GetPost(id xid.ID) (Post, error)
+	GetComment(id xid.ID) (Comment, error)
+	GetUser(id xid.ID) (User, error)
+	FindUserByName(name string) (User, error)
 
 	AllPosts() ([]Post, error)
 
@@ -78,24 +76,22 @@ var (
 )
 
 // Connects to the specified backend
-// args order is db username, password, address, port, db name
-// args order for json is time.Duration for the save interval
-func Connect(backend DatebaseBackends, args ...interface{}) (Database, error) {
-	var db Database
+// json arg = time.Duration for the save interval
+func Connect(backend string, args ...interface{}) (Database, error) {
 	switch backend {
 	case JSON:
-		folders := filepath.Join("carrotbb", "storage")
 		interval := 5 * time.Minute
 		if len(args) > 0 {
 			interval = args[0].(time.Duration)
 		}
-		js, err := ConnectJSON(folders, "database.json", interval)
+		js, err := ConnectJSON(interval)
 		if err != nil {
 			return nil, err
 		}
-		db = js
+		return js, nil
+	case Postgres:
+		return ConnectPostgres()
 	default:
 		return nil, ErrUnsupportedDatabaseBackend
 	}
-	return db, nil
 }

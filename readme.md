@@ -30,3 +30,14 @@ bulletin board
 - image embeds
 - moderation system
 - cache for served content
+- docker file
+
+## setting up
+- postgres:
+    - `createuser --interactive`
+    - `psql`
+    - `ALTER USER user WITH PASSWORD 'password';`
+    - `\q`
+    - `createdb carrotbb`
+- fill the `.env` by looking at `exampledotenv.txt`
+- `go run .` or `go build .` then `./carrotbb`

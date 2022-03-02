@@ -21,21 +21,26 @@ type JSONDatabaseStructure struct {
 type JSONDatabase struct {
 	JSONDatabaseStructure
 
-	PostsLock    sync.RWMutex
-	CommentsLock sync.RWMutex
-	UsersLock    sync.RWMutex
+	postsLock    sync.RWMutex
+	commentsLock sync.RWMutex
+	usersLock    sync.RWMutex
 
-	SaveTicker *time.Ticker
-	StopSaving chan bool
+	saveTicker *time.Ticker
+	stopSaving chan bool
 
-	BackingPath string
+	backingPath string
 }
 
-func ConnectJSON(folders, filename string, saveInterval time.Duration) (*JSONDatabase, error) {
+func ConnectJSON(saveInterval time.Duration) (*JSONDatabase, error) {
+	if os.Getenv("JSON_FOLDER_PATH") == "" || os.Getenv("JSON_FILE_NAME") == "" {
+		log.Fatalln("json folder path or file name is empty")
+	}
+	folders := filepath.FromSlash(os.Getenv("JSON_FOLDER_PATH"))
+	fileName := os.Getenv("JSON_FILE_NAME")
 	if err := os.MkdirAll(folders, 0777); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(folders, filename)
+	path := filepath.Join(folders, fileName)
 	jsonFile, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
@@ -54,18 +59,18 @@ func ConnectJSON(folders, filename string, saveInterval time.Duration) (*JSONDat
 	}
 	data := &JSONDatabase{
 		JSONDatabaseStructure: dbStructure,
-		SaveTicker:            time.NewTicker(saveInterval),
-		StopSaving:            make(chan bool, 1),
-		BackingPath:           path,
+		saveTicker:            time.NewTicker(saveInterval),
+		stopSaving:            make(chan bool, 1),
+		backingPath:           path,
 	}
 	go func() {
 		for {
 			select {
-			case <-data.StopSaving:
+			case <-data.stopSaving:
 				return
-			case <-data.SaveTicker.C:
+			case <-data.saveTicker.C:
 				log.Println("saving json database")
-				if err := data.SaveDatabase(); err != nil {
+				if err := data.saveDatabase(); err != nil {
 					log.Println("error saving json database", err)
 				}
 			}
@@ -74,18 +79,18 @@ func ConnectJSON(folders, filename string, saveInterval time.Duration) (*JSONDat
 	return data, nil
 }
 
-func (j *JSONDatabase) SaveDatabase() error {
-	jsonFile, err := os.OpenFile(j.BackingPath, os.O_WRONLY|os.O_TRUNC, 0644)
+func (j *JSONDatabase) saveDatabase() error {
+	jsonFile, err := os.OpenFile(j.backingPath, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer jsonFile.Close()
-	j.PostsLock.Lock()
-	j.CommentsLock.Lock()
-	j.UsersLock.Lock()
-	defer j.PostsLock.Unlock()
-	defer j.CommentsLock.Unlock()
-	defer j.UsersLock.Unlock()
+	j.postsLock.Lock()
+	j.commentsLock.Lock()
+	j.usersLock.Lock()
+	defer j.postsLock.Unlock()
+	defer j.commentsLock.Unlock()
+	defer j.usersLock.Unlock()
 	bs, err := json.Marshal(j.JSONDatabaseStructure)
 	if err != nil {
 		return err
@@ -96,19 +101,19 @@ func (j *JSONDatabase) SaveDatabase() error {
 
 func (j *JSONDatabase) Disconnect() error {
 	// TODO: there has to be a race condition here fosho
-	// j.PostsLock.Lock()
-	// j.CommentsLock.Lock()
-	// j.UsersLock.Lock()
-	// defer j.PostsLock.Unlock()
-	// defer j.CommentsLock.Unlock()
-	// defer j.UsersLock.Unlock()
-	j.StopSaving <- true
-	return j.SaveDatabase()
+	// j.postsLock.Lock()
+	// j.commentsLock.Lock()
+	// j.usersLock.Lock()
+	// defer j.postsLock.Unlock()
+	// defer j.commentsLock.Unlock()
+	// defer j.usersLock.Unlock()
+	j.stopSaving <- true
+	return j.saveDatabase()
 }
 
 func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, error) {
-	j.PostsLock.Lock()
-	defer j.PostsLock.Unlock()
+	j.postsLock.Lock()
+	defer j.postsLock.Unlock()
 	newID := xid.New()
 	newP := Post{
 		Title:       title,
@@ -123,8 +128,8 @@ func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, 
 }
 
 func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.ID, error) {
-	j.CommentsLock.Lock()
-	defer j.CommentsLock.Unlock()
+	j.commentsLock.Lock()
+	defer j.commentsLock.Unlock()
 	newID := xid.New()
 	newC := Comment{
 		Content:     content,
@@ -144,8 +149,8 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.
 }
 
 func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
-	j.UsersLock.Lock()
-	defer j.UsersLock.Unlock()
+	j.usersLock.Lock()
+	defer j.usersLock.Unlock()
 	newID := xid.New()
 	newU := User{
 		Name:       name,
@@ -157,48 +162,48 @@ func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
 	return newID, nil
 }
 
-func (j *JSONDatabase) GetPost(id xid.ID) (*Post, error) {
-	j.PostsLock.RLock()
-	defer j.PostsLock.RUnlock()
+func (j *JSONDatabase) GetPost(id xid.ID) (Post, error) {
+	j.postsLock.RLock()
+	defer j.postsLock.RUnlock()
 	for n := range j.Posts {
 		if j.Posts[n].ID == id {
-			return &j.Posts[n], nil
+			return j.Posts[n], nil
 		}
 	}
-	return nil, ErrNoPostFoundByID
+	return Post{}, ErrNoPostFoundByID
 }
 
-func (j *JSONDatabase) GetComment(id xid.ID) (*Comment, error) {
-	j.CommentsLock.RLock()
-	defer j.CommentsLock.RUnlock()
+func (j *JSONDatabase) GetComment(id xid.ID) (Comment, error) {
+	j.commentsLock.RLock()
+	defer j.commentsLock.RUnlock()
 	for n := range j.Comments {
 		if j.Comments[n].ID == id {
-			return &j.Comments[n], nil
+			return j.Comments[n], nil
 		}
 	}
-	return nil, ErrNoCommentFoundByID
+	return Comment{}, ErrNoCommentFoundByID
 }
 
-func (j *JSONDatabase) GetUser(id xid.ID) (*User, error) {
-	j.UsersLock.RLock()
-	defer j.UsersLock.RUnlock()
+func (j *JSONDatabase) GetUser(id xid.ID) (User, error) {
+	j.usersLock.RLock()
+	defer j.usersLock.RUnlock()
 	for n := range j.Users {
 		if j.Users[n].ID == id {
-			return &j.Users[n], nil
+			return j.Users[n], nil
 		}
 	}
-	return nil, ErrNoUserFoundByID
+	return User{}, ErrNoUserFoundByID
 }
 
-func (j *JSONDatabase) FindUserByName(name string) (*User, error) {
-	j.UsersLock.RLock()
-	defer j.UsersLock.RUnlock()
+func (j *JSONDatabase) FindUserByName(name string) (User, error) {
+	j.usersLock.RLock()
+	defer j.usersLock.RUnlock()
 	for n := range j.Users {
 		if j.Users[n].Name == name {
-			return &j.Users[n], nil
+			return j.Users[n], nil
 		}
 	}
-	return nil, ErrUsernameNotFound
+	return User{}, ErrUsernameNotFound
 }
 
 func (j *JSONDatabase) AllPosts() ([]Post, error) {
@@ -216,16 +221,14 @@ func (j *JSONDatabase) AllCommentsUnderPost(postID xid.ID) ([]Comment, error) {
 }
 
 func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, comments map[Comment]User, err error) {
-	postP, err := j.GetPost(postID)
+	post, err = j.GetPost(postID)
 	if err != nil {
 		return
 	}
-	post = *postP
-	posterP, err := j.GetUser(post.PosterID)
+	poster, err = j.GetUser(post.PosterID)
 	if err != nil {
 		return
 	}
-	poster = *posterP
 	comments = make(map[Comment]User)
 	for _, cID := range post.CommentIDs {
 		commentP, err := j.GetComment(cID)
@@ -235,10 +238,10 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 		}
 		commenterP, err := j.GetUser(commentP.PosterID)
 		if err != nil {
-			comments[*commentP] = DeletedUser
+			comments[commentP] = DeletedUser
 			continue
 		}
-		comments[*commentP] = *commenterP
+		comments[commentP] = commenterP
 	}
 	return
 }

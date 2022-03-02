@@ -1,14 +1,15 @@
 package database
 
 import (
-	"path/filepath"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestConnectJSON(t *testing.T) {
-	path := filepath.Join("carrotbb", "storage")
-	j, err := ConnectJSON(path, "testdatabase.json", 3*time.Second)
+	os.Setenv("JSON_FOLDER_PATH", "carrotbb/storage")
+	os.Setenv("JSON_FILE_NAME", "testdatabase.json")
+	j, err := ConnectJSON(3 * time.Second)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -19,7 +20,7 @@ func TestConnectJSON(t *testing.T) {
 	}
 	time.Sleep(5 * time.Second)
 	j.Disconnect()
-	j, err = ConnectJSON(path, "testdatabase.json", 30*time.Second)
+	j, err = ConnectJSON(30 * time.Second)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()

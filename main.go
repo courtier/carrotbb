@@ -11,6 +11,7 @@ import (
 
 	"github.com/courtier/carrotbb/database"
 	"github.com/courtier/carrotbb/templates"
+	"github.com/joho/godotenv"
 	"github.com/rs/xid"
 )
 
@@ -21,7 +22,15 @@ var (
 
 func main() {
 	var err error
-	db, err = database.Connect(database.JSON, 5*time.Minute)
+
+	err = godotenv.Load()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	dbBackend := os.Getenv("DB_BACKEND")
+
+	db, err = database.Connect(dbBackend, 5*time.Minute)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -30,6 +39,8 @@ func main() {
 			log.Println(err)
 		}
 	}()
+
+	log.Println("connected to database")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", IndexPage)
