@@ -104,7 +104,7 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	if isRequestAuthenticatedSimple(r) {
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
@@ -150,7 +150,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, userID)
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -158,7 +158,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	if isRequestAuthenticatedSimple(r) {
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
@@ -198,7 +198,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, user.ID)
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

@@ -15,11 +15,9 @@ bulletin board
 - postgresql backend
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
-- return to referer once logged in
 - store session token hashes in database
 - config file
-    - store json db backing file, postgres user, port, ssl cert folder etc.
-- convert password and session hashes to scrypt
+    - store port, ssl cert folder etc.
 
 ## long term todos
 - csrf tokens
