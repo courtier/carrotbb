@@ -152,6 +152,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		authenticateUser(w, token, userID)
 		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
 	default:
+		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
@@ -200,6 +201,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		authenticateUser(w, token, user.ID)
 		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
 	default:
+		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
@@ -265,6 +267,7 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
 	default:
+		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
@@ -275,6 +278,7 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != "POST" {
+		w.Header().Add("Allow", "POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}

@@ -52,6 +52,7 @@ type Comment struct {
 	PostID      xid.ID
 	PosterID    xid.ID
 	ID          xid.ID
+	Deleted     bool
 	DateCreated time.Time
 }
 
@@ -59,6 +60,7 @@ type User struct {
 	Name       string
 	ID         xid.ID
 	Password   string
+	Deleted    bool
 	DateJoined time.Time
 }
 

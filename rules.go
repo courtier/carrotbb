@@ -6,14 +6,11 @@ import (
 )
 
 var (
-	ErrNameBadLength      = errors.New("username must be between 1 and 24 characters")
-	ErrNameBadCharacter   = errors.New("username can only contain letters, numbers and underscore")
-	ErrTitleBadLength     = errors.New("title must be between 1 and 64 characters")
-	ErrDisallowedTitle    = errors.New("disallowed content in title")
-	ErrContentBadLength   = errors.New("content must be between 1 and 65535 characters")
-	ErrDisallowedContent  = errors.New("disallowed content in content")
-	ErrPasswordBadLength  = errors.New("password must be between 1 and 144 characters")
-	ErrDisallowedPassword = errors.New("disallowed content in password")
+	ErrNameBadLength     = errors.New("username must be between 1 and 24 characters")
+	ErrNameBadCharacter  = errors.New("username can only contain letters, numbers and underscore")
+	ErrTitleBadLength    = errors.New("title must be between 1 and 64 characters")
+	ErrContentBadLength  = errors.New("content must be between 1 and 65535 characters")
+	ErrPasswordBadLength = errors.New("password must be between 1 and 144 characters")
 )
 
 // Length must be between 1 and 24 chars, only letters, numbers and underscores
@@ -33,23 +30,12 @@ func isTitleValid(content string) error {
 	if len(content) < 1 || len(content) > 64 {
 		return ErrTitleBadLength
 	}
-	for _, r := range content {
-		if unicode.IsControl(r) {
-			return ErrDisallowedTitle
-		}
-	}
 	return nil
 }
 
-// No funny unicode stuff allowed
 func isContentValid(content string) error {
 	if len(content) < 1 || len(content) > 65535 {
 		return ErrContentBadLength
-	}
-	for _, r := range content {
-		if unicode.IsControl(r) {
-			return ErrDisallowedContent
-		}
 	}
 	return nil
 }
@@ -57,11 +43,6 @@ func isContentValid(content string) error {
 func isPasswordValid(password string) error {
 	if len(password) < 1 || len(password) > 144 {
 		return ErrPasswordBadLength
-	}
-	for _, r := range password {
-		if unicode.IsControl(r) {
-			return ErrDisallowedPassword
-		}
 	}
 	return nil
 }

@@ -16,8 +16,8 @@ bulletin board
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
 - store session token hashes in database
-- config file
-    - store port, ssl cert folder etc.
+- sort comments by their creation date
+- switch from xid to uuid
 
 ## long term todos
 - csrf tokens
@@ -27,6 +27,7 @@ bulletin board
 
 ## nice to haves for the future
 - image embeds
+- quoting other comments
 - moderation system
 - cache for served content
 - docker file
