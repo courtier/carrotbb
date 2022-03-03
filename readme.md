@@ -7,23 +7,23 @@ bulletin board
 - extensive test coverage
 - explanatory comments
 - multiple database backends with a shared interface
-    - supported: json (very slow, for prototyping only)
-    - planned: postgresql
-    - nice to have: mongodb, sqlite
+    - supported: json (very slow, for prototyping only), postgresql
+    - nice to have in the future: mongodb, sqlite
 
 ## immediate todos
-- postgresql backend
+- clean up auth.go (delete functions)
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
 - store session token hashes in database
 - sort comments by their creation date
-- switch from xid to uuid
+- redirect to referer
 
 ## long term todos
 - csrf tokens
 - more tests
 - css
 - logging
+- paging posts and comments
 
 ## nice to haves for the future
 - image embeds
@@ -31,6 +31,10 @@ bulletin board
 - moderation system
 - cache for served content
 - docker file
+
+## notes
+- forked xid to work with pgx without any type conversions
+    - https://github.com/courtier/xid
 
 ## setting up
 - postgres:

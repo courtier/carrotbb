@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/courtier/carrotbb/database"
+	"github.com/rs/xid"
 )
 
 const postPageTemplateStr = `<html lang="en">
@@ -52,14 +53,15 @@ type PostPageTemplateData struct {
 	Username string
 	Post     database.Post
 	Poster   database.User
-	Comments map[database.Comment]database.User
+	Comments []database.Comment
+	Users    map[xid.ID]database.User
 }
 
 var (
 	postPageTemplate = template.Must(template.New("postPageTemplate").Parse(postPageTemplateStr))
 )
 
-func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post database.Post, poster database.User, comments map[database.Comment]database.User) error {
+func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post database.Post, poster database.User, comments []database.Comment, users map[xid.ID]database.User) error {
 	data := PostPageTemplateData{
 		SignedIn: signedIn,
 		Username: name,

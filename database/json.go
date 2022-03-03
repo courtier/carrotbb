@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ type JSONDatabaseStructure struct {
 	Posts    []Post
 	Comments []Comment
 	Users    []User
+	Sessions []Session
 }
 
 type JSONDatabase struct {
@@ -24,6 +26,7 @@ type JSONDatabase struct {
 	postsLock    sync.RWMutex
 	commentsLock sync.RWMutex
 	usersLock    sync.RWMutex
+	sessionsLock sync.RWMutex
 
 	saveTicker *time.Ticker
 	stopSaving chan bool
@@ -162,6 +165,19 @@ func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
 	return newID, nil
 }
 
+func (j *JSONDatabase) AddSession(tokenHash string, userID xid.ID, expiry time.Time) (err error) {
+	j.sessionsLock.Lock()
+	defer j.sessionsLock.Unlock()
+	// newU := Session{
+	// 	Name:       name,
+	// 	ID:         newID,
+	// 	Password:   password,
+	// 	DateJoined: time.Now(),
+	// }
+	// j.Users = append(j.Users, newU)
+	return nil
+}
+
 func (j *JSONDatabase) GetPost(id xid.ID) (Post, error) {
 	j.postsLock.RLock()
 	defer j.postsLock.RUnlock()
@@ -220,7 +236,7 @@ func (j *JSONDatabase) AllCommentsUnderPost(postID xid.ID) ([]Comment, error) {
 	return cs, nil
 }
 
-func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, comments map[Comment]User, err error) {
+func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, comments []Comment, users map[xid.ID]User, err error) {
 	post, err = j.GetPost(postID)
 	if err != nil {
 		return
@@ -229,19 +245,43 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 	if err != nil {
 		return
 	}
-	comments = make(map[Comment]User)
+	comments = make([]Comment, 0)
+	users = make(map[xid.ID]User)
 	for _, cID := range post.CommentIDs {
 		commentP, err := j.GetComment(cID)
 		if err != nil {
 			// TODO: Ignore error here or return out of the function?
 			continue
 		}
-		commenterP, err := j.GetUser(commentP.PosterID)
+		comments = append(comments, commentP)
+	}
+	sort.Slice(comments, func(i, j int) bool {
+		return comments[i].DateCreated.Before(comments[j].DateCreated)
+	})
+	for _, comment := range comments {
+		commenterP, err := j.GetUser(comment.PosterID)
 		if err != nil {
-			comments[commentP] = DeletedUser
+			users[comment.ID] = DeletedUser
 			continue
 		}
-		comments[commentP] = commenterP
+		users[comment.ID] = commenterP
 	}
 	return
+}
+
+func sortSliceByDate(slice interface{}) {
+	switch v := slice.(type) {
+	case []Post:
+		sort.Slice(v, func(i, j int) bool {
+			return v[i].DateCreated.Before(v[j].DateCreated)
+		})
+	case []Comment:
+		sort.Slice(v, func(i, j int) bool {
+			return v[i].DateCreated.Before(v[j].DateCreated)
+		})
+	case []User:
+		sort.Slice(v, func(i, j int) bool {
+			return v[i].DateJoined.Before(v[j].DateJoined)
+		})
+	}
 }

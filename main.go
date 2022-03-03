@@ -25,14 +25,14 @@ func main() {
 
 	err = godotenv.Load()
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 
 	dbBackend := os.Getenv("DB_BACKEND")
 
 	db, err = database.Connect(dbBackend, 5*time.Minute)
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 	defer func() {
 		if err := db.Disconnect(); err != nil {
@@ -91,7 +91,7 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 		templates.GenerateErrorPage(w, "malformed post id")
 		return
 	}
-	post, poster, comments, err := db.GetPostPageData(postID)
+	post, poster, comments, users, err := db.GetPostPageData(postID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		templates.GenerateErrorPage(w, "error while fetching the post")
@@ -99,12 +99,12 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	signedIn, username := extractUsername(r)
-	templates.GeneratePostPage(w, signedIn, username, post, poster, comments)
+	templates.GeneratePostPage(w, signedIn, username, post, poster, comments, users)
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	if isRequestAuthenticatedSimple(r) {
-		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
@@ -150,7 +150,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, userID)
-		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 	default:
 		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -159,7 +159,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	if isRequestAuthenticatedSimple(r) {
-		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
@@ -199,7 +199,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, user.ID)
-		http.Redirect(w, r, r.Header.Get("Referer"), http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 	default:
 		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)

@@ -30,3 +30,30 @@ func TestConnectJSON(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestSortSliceByDate(t *testing.T) {
+	const POST_AMOUNT = 10
+	posts := []Post{}
+	sortedPosts := make(map[int]Post)
+	// fill array with ascending order posts, save the sort in map
+	for i := 0; i < POST_AMOUNT; i++ {
+		post := Post{DateCreated: time.Now()}
+		posts = append(posts, post)
+		sortedPosts[i] = post
+		time.Sleep(50 * time.Millisecond)
+	}
+	// reverse array
+	for i, j := 0, POST_AMOUNT-1; i < j; i, j = i+1, j-1 {
+		temp := posts[i]
+		posts[i] = posts[j]
+		posts[j] = temp
+	}
+	// sort
+	sortSliceByDate(posts)
+	// check
+	for i := 0; i < POST_AMOUNT; i++ {
+		if posts[i].DateCreated != sortedPosts[i].DateCreated {
+			t.FailNow()
+		}
+	}
+}
