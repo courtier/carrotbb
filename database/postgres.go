@@ -210,7 +210,7 @@ func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster Use
 	for _, comment := range comments {
 		commenterBatch.Queue(`SELECT * FROM users WHERE id=$1`, comment.PosterID)
 	}
-	commenterBR := p.pool.SendBatch(context.Background(), batch)
+	commenterBR := p.pool.SendBatch(context.Background(), commenterBatch)
 	defer commenterBR.Close()
 	for _, comment := range comments {
 		var user User
