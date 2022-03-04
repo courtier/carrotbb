@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/courtier/carrotbb/database"
 	"github.com/courtier/carrotbb/templates"
 	"github.com/joho/godotenv"
 	"github.com/rs/xid"
+	"go.uber.org/zap"
 )
 
 var (
@@ -40,7 +40,7 @@ func main() {
 		httpsPort = ":" + httpsPort
 	}
 
-	db, err = database.Connect(dbBackend, 5*time.Minute)
+	db, err = database.Connect(dbBackend)
 	if err != nil {
 		panic(err)
 	}
@@ -61,19 +61,26 @@ func main() {
 
 	auther := NewAuthMiddleware(mux)
 
+	zapper, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	defer zapper.Sync()
+	logger := NewLoggerMiddleware(auther, zapper)
+
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	if httpPort != "" {
 		go func() {
 			log.Println("listening http on port", httpPort)
-			log.Fatal(http.ListenAndServe(httpPort, auther))
+			log.Fatal(http.ListenAndServe(httpPort, logger))
 		}()
 	}
 	if httpsPort != "" {
 		go func() {
 			log.Println("listening https on port", httpsPort)
-			log.Fatal(http.ListenAndServeTLS(httpsPort, certFile, keyFile, auther))
+			log.Fatal(http.ListenAndServeTLS(httpsPort, certFile, keyFile, logger))
 		}()
 	}
 

@@ -5,10 +5,8 @@ bulletin board
 - basic bulletin board implementation
 - readable, clean code
 - extensive test coverage
-- explanatory comments
 - multiple database backends with a shared interface
     - supported: json (very slow, for prototyping only), postgresql
-    - nice to have in the future: mongodb, sqlite
 
 ## immediate todos
 - more tests
@@ -27,6 +25,7 @@ bulletin board
 - moderation system
 - cache for served content
 - docker file
+- mongodb, sqlite backends
 
 ## notes
 - forked xid to work with pgx without any hiccups

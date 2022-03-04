@@ -7,11 +7,6 @@ import (
 	"github.com/rs/xid"
 )
 
-const (
-	JSON     string = "json"
-	Postgres string = "postgres"
-)
-
 var (
 	ErrUnsupportedDatabaseBackend = errors.New("unsupported database backend")
 	ErrNoPostFoundByID            = errors.New("no matching post id found")
@@ -21,20 +16,29 @@ var (
 )
 
 type Database interface {
+	// AddPost adds a post to the database
 	AddPost(title, content string, posterID xid.ID) (xid.ID, error)
+	// AddComment adds a comment to the database
 	AddComment(content string, postID, posterID xid.ID) (xid.ID, error)
+	// AddUser adds a user to the database
 	AddUser(name, password string) (xid.ID, error)
 
+	// GetPost gets a post from the database
 	GetPost(id xid.ID) (Post, error)
+	// GetComment gets a comment from the database
 	GetComment(id xid.ID) (Comment, error)
+	// GetUser gets a user from the database
 	GetUser(id xid.ID) (User, error)
+	// FindUserByName finds a user by that name in the database
 	FindUserByName(name string) (User, error)
 
+	// AllPosts returns all the posts in the database
 	AllPosts() ([]Post, error)
 
-	// TODO: with actual database these all could be 1 query
+	// GetPostPageData returns all the data necessary to render a post page
 	GetPostPageData(postID xid.ID) (Post, User, []Comment, map[xid.ID]User, error)
 
+	// Disconnect gracefully disconnects from a database
 	Disconnect() error
 }
 
@@ -77,21 +81,18 @@ var (
 	}
 )
 
-// Connects to the specified backend
-// json arg = time.Duration for the save interval
-func Connect(backend string, args ...interface{}) (Database, error) {
+// Connect connects to the specified database backend
+// Possible values are "json" and "postgres"
+func Connect(backend string) (Database, error) {
 	switch backend {
-	case JSON:
+	case "json":
 		interval := 5 * time.Minute
-		if len(args) > 0 {
-			interval = args[0].(time.Duration)
-		}
 		js, err := ConnectJSON(interval)
 		if err != nil {
 			return nil, err
 		}
 		return js, nil
-	case Postgres:
+	case "postgres":
 		return ConnectPostgres()
 	default:
 		return nil, ErrUnsupportedDatabaseBackend
