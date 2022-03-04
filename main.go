@@ -349,6 +349,9 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func pathIntoArray(path string) []string {
+	if path == "" {
+		return []string{}
+	}
 	if path[0] == '/' {
 		path = path[1:]
 	}

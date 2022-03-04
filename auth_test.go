@@ -12,14 +12,15 @@ func TestIsExpired(t *testing.T) {
 	s := session{userID: xid.NilID(), expiry: time.Now()}
 	time.Sleep(10 * time.Millisecond)
 	if !s.isExpired() {
-		t.FailNow()
+		t.Error("Session should be expired")
 	}
 }
 
 func TestSaltAndHash(t *testing.T) {
 	hash := saltAndHash("hello", "world")
-	if hash != "$argon2id$v=19$m=16384,t=4,p=4$Kmu5BL5wS9ervTy25ilRQCwjj1T2rkwf00ekySVkvQs$d29ybGQ" {
-		t.FailNow()
+	expected := "$argon2id$v=19$m=16384,t=4,p=4$Kmu5BL5wS9ervTy25ilRQCwjj1T2rkwf00ekySVkvQs$d29ybGQ"
+	if hash != expected {
+		t.Error("Expected:", expected, "got:", hash)
 	}
 }
 
@@ -35,6 +36,6 @@ func TestExtractSession(t *testing.T) {
 		Value: sessionToken,
 	})
 	if token, err := extractSession(r); err != nil || token != sessionToken {
-		t.FailNow()
+		t.Error("Expected:", sessionToken, "got:", token)
 	}
 }
