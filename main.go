@@ -29,6 +29,17 @@ func main() {
 	}
 
 	dbBackend := os.Getenv("DB_BACKEND")
+	httpPort := os.Getenv("HTTP_PORT")
+	httpsPort := os.Getenv("HTTPS_PORT")
+	certFile := os.Getenv("SSL_CERT_FILE")
+	keyFile := os.Getenv("SSL_KEY_FILE")
+
+	if httpPort != "" && httpPort[0] != ':' {
+		httpPort = ":" + httpPort
+	}
+	if httpsPort != "" && httpsPort[0] != ':' {
+		httpsPort = ":" + httpsPort
+	}
 
 	db, err = database.Connect(dbBackend, 5*time.Minute)
 	if err != nil {
@@ -40,16 +51,11 @@ func main() {
 		}
 	}()
 
-	log.Println("connected to database")
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", IndexPage)
-
 	mux.HandleFunc("/createpost", CreatePostHandler)
 	mux.HandleFunc("/post/", PostPage)
-
 	mux.HandleFunc("/createcomment", CreateCommentHandler)
-
 	mux.HandleFunc("/signup", SignupHandler)
 	mux.HandleFunc("/signin", SigninHandler)
 	mux.HandleFunc("/logout", LogoutHandler)
@@ -59,10 +65,18 @@ func main() {
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
-	go func() {
-		log.Println("listening on port :8080")
-		log.Fatal(http.ListenAndServe(":8080", auther))
-	}()
+	if httpPort != "" {
+		go func() {
+			log.Println("listening http on port", httpPort)
+			log.Fatal(http.ListenAndServe(httpPort, auther))
+		}()
+	}
+	if httpsPort != "" {
+		go func() {
+			log.Println("listening https on port", httpsPort)
+			log.Fatal(http.ListenAndServeTLS(httpsPort, certFile, keyFile, auther))
+		}()
+	}
 
 	<-terminate
 }

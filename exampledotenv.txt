@@ -3,3 +3,9 @@ DB_BACKEND="postgres"
 POSTGRES_URL="postgres://carrot:carrot@localhost:5432/carrotbb"
 JSON_FOLDER_PATH="carrotbb/storage"
 JSON_FILE_NAME="database.json"
+#Leave empty to disable
+HTTP_PORT="8080"
+#Leave empty to disable
+HTTPS_PORT=""
+SSL_CERT_FILE="certs/cert.csr"
+SSL_KEY_FILE="certs/private.key"
