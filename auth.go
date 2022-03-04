@@ -24,16 +24,21 @@ var (
 	ErrRandReadUnmatched = errors.New("rand read less bytes than required")
 )
 
+var (
+	sessionCache = make(map[string]session)
+)
+
 type session struct {
 	userID xid.ID
 	expiry time.Time
 }
 
+// isExpired checks if a session is expired
 func (s session) isExpired() bool {
 	return s.expiry.Before(time.Now())
 }
 
-// Will be used for csrf and session tokens
+// newRandomToken should be used for generating session/csrf tokens
 func newRandomToken() (string, error) {
 	b := make([]byte, 8)
 	// We use math/rand here as I think sha256 hashing is
@@ -55,7 +60,7 @@ const (
 	argonKeyLen  = 32
 )
 
-// Salt and hash initial using argon2
+// saltAndHash returns the Argon2 hash of initial using salt as salt
 func saltAndHash(initial, salt string) string {
 	key := argon2.IDKey([]byte(initial), []byte(salt), argonTime, argonMemory, argonThreads, argonKeyLen)
 	basedKey := base64.RawStdEncoding.EncodeToString(key)
@@ -64,6 +69,8 @@ func saltAndHash(initial, salt string) string {
 	return encoded
 }
 
+// extractSession extracts a session token if possible from a request
+// Returns an error if the token is not in the cache
 func extractSession(r *http.Request) (token string, err error) {
 	c, err := r.Cookie("session_token")
 	if err == http.ErrNoCookie {
@@ -77,6 +84,7 @@ func extractSession(r *http.Request) (token string, err error) {
 	return
 }
 
+// isRequestAuthenticatedSimple simply checks if a request is authenticated
 func isRequestAuthenticatedSimple(r *http.Request) bool {
 	token, err := extractSession(r)
 	if err != nil {
@@ -85,6 +93,7 @@ func isRequestAuthenticatedSimple(r *http.Request) bool {
 	return !sessionCache[token].isExpired()
 }
 
+// extractUser extracts the user if authenticated from a request
 func extractUser(r *http.Request) (user database.User, err error) {
 	c, err := r.Cookie("session_token")
 	if err == http.ErrNoCookie {
@@ -99,6 +108,7 @@ func extractUser(r *http.Request) (user database.User, err error) {
 	return db.GetUser(sesh.userID)
 }
 
+// extractUsername returns true and the username of the user if authenticated, false and empty string if not
 func extractUsername(r *http.Request) (bool, string) {
 	var signedIn bool
 	var username string
@@ -110,6 +120,7 @@ func extractUsername(r *http.Request) (bool, string) {
 	return signedIn, username
 }
 
+// AuthMiddleware checks for expired tokens and deletes them if it catches any
 type AuthMiddleware struct {
 	handler http.Handler
 }
@@ -118,7 +129,6 @@ func NewAuthMiddleware(handler http.Handler) *AuthMiddleware {
 	return &AuthMiddleware{handler}
 }
 
-// what happens if we just dont refresh and hand out weekly tokens
 func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token, err := extractSession(r)
 	if err == nil && sessionCache[token].isExpired() {
@@ -127,6 +137,7 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.handler.ServeHTTP(w, r)
 }
 
+// authenticateUser puts the token and session in the cache and sets the cookie
 func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
 	sessionCache[token] = session{
 		userID: userID,
@@ -141,6 +152,7 @@ func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
 	})
 }
 
+// unauthenticateUser removes the token and session from the cache and removes the cookie
 func unauthenticateUser(w http.ResponseWriter, token string) {
 	delete(sessionCache, token)
 	http.SetCookie(w, &http.Cookie{

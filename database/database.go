@@ -24,7 +24,6 @@ type Database interface {
 	AddPost(title, content string, posterID xid.ID) (xid.ID, error)
 	AddComment(content string, postID, posterID xid.ID) (xid.ID, error)
 	AddUser(name, password string) (xid.ID, error)
-	AddSession(tokenHash string, userID xid.ID, expiry time.Time) error
 
 	GetPost(id xid.ID) (Post, error)
 	GetComment(id xid.ID) (Comment, error)
@@ -63,12 +62,6 @@ type User struct {
 	Password   string
 	Deleted    bool
 	DateJoined time.Time
-}
-
-type Session struct {
-	TokenHash string
-	UserID    xid.ID
-	Expiry    time.Time
 }
 
 type DBFrontend struct {

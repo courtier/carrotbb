@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	db           database.Database
-	sessionCache = make(map[string]session)
+	db database.Database
 )
 
 func main() {

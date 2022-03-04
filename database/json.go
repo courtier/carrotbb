@@ -17,7 +17,6 @@ type JSONDatabaseStructure struct {
 	Posts    []Post
 	Comments []Comment
 	Users    []User
-	Sessions []Session
 }
 
 type JSONDatabase struct {
@@ -26,7 +25,6 @@ type JSONDatabase struct {
 	postsLock    sync.RWMutex
 	commentsLock sync.RWMutex
 	usersLock    sync.RWMutex
-	sessionsLock sync.RWMutex
 
 	saveTicker *time.Ticker
 	stopSaving chan bool
@@ -163,19 +161,6 @@ func (j *JSONDatabase) AddUser(name, password string) (xid.ID, error) {
 	}
 	j.Users = append(j.Users, newU)
 	return newID, nil
-}
-
-func (j *JSONDatabase) AddSession(tokenHash string, userID xid.ID, expiry time.Time) (err error) {
-	j.sessionsLock.Lock()
-	defer j.sessionsLock.Unlock()
-	// newU := Session{
-	// 	Name:       name,
-	// 	ID:         newID,
-	// 	Password:   password,
-	// 	DateJoined: time.Now(),
-	// }
-	// j.Users = append(j.Users, newU)
-	return nil
 }
 
 func (j *JSONDatabase) GetPost(id xid.ID) (Post, error) {

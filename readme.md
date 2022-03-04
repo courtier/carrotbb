@@ -11,15 +11,13 @@ bulletin board
     - nice to have in the future: mongodb, sqlite
 
 ## immediate todos
-- ability to delete posts, comments, accounts
-    - deletable users (deleted field, change name to deleted)
-- store session token hashes in database
+- more tests
 - logging
-- https support
 
 ## long term todos
+- ability to delete posts, comments, accounts
+    - deletable users (deleted field, change name to deleted)
 - csrf tokens
-- more tests
 - css
 - paging posts and comments
 
