@@ -19,30 +19,30 @@ var (
 const CREATE_POSTS_TABLE = `CREATE TABLE IF NOT EXISTS posts (
 	title			text,
 	content			text,
-	poster_id		bytea,
-	id				bytea PRIMARY KEY,
-	comment_ids		bytea[],
+	poster_id		text,
+	id				text PRIMARY KEY,
+	comment_ids		text ARRAY,
 	date_created	timestamp
 );`
 
 const CREATE_COMMENTS_TABLE = `CREATE TABLE IF NOT EXISTS comments (
 	content			text,
-	post_id			bytea,
-	poster_id		bytea,
-	id				bytea PRIMARY KEY,
+	post_id			text,
+	poster_id		text,
+	id				text PRIMARY KEY,
 	date_created	timestamp
 );`
 
 const CREATE_USERS_TABLE = `CREATE TABLE IF NOT EXISTS users (
 	name			text UNIQUE,
-	id				bytea,
+	id				text,
 	password		text PRIMARY KEY,
 	date_joined		timestamp
 );`
 
 const CREATE_SESSIONS_TABLE = `CREATE TABLE IF NOT EXISTS sessions (
-	hash			bytea PRIMARY KEY,
-	user_id			bytea,
+	hash			text PRIMARY KEY,
+	user_id			text,
 	expiry			timestamp
 );`
 
@@ -65,11 +65,6 @@ func ConnectPostgres() (db *PostgresDatabase, err error) {
 				return err
 			}
 		}
-		// conn.ConnInfo().RegisterDataType(pgtype.DataType{
-		// 	Value: xid.ID{},
-		// 	Name:  "uuid",
-		// 	OID:   pgtype.UUIDOID,
-		// })
 		return nil
 	}
 	pool, err := pgxpool.ConnectConfig(context.Background(), config)
@@ -174,6 +169,7 @@ func (p *PostgresDatabase) AllPosts() (posts []Post, err error) {
 		var post Post
 		err = rows.Scan(&post.Title, &post.Content, &post.PosterID, &post.ID, &post.CommentIDs, &post.DateCreated)
 		if err != nil {
+			log.Println(err)
 			return
 		}
 		posts = append(posts, post)
@@ -188,7 +184,7 @@ func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster Use
 	}
 	batch := &pgx.Batch{}
 	batch.Queue(`SELECT * FROM users WHERE id=$1`, post.PosterID)
-	batch.Queue(`SELECT * FROM comments WHERE id IN $1 ORDER BY date_created ASC`, post.CommentIDs)
+	batch.Queue(`SELECT * FROM comments WHERE id = ANY ($1) ORDER BY date_created ASC`, post.CommentIDs)
 	br := p.pool.SendBatch(context.Background(), batch)
 	defer br.Close()
 	err = br.QueryRow().Scan(&poster.Name, &poster.ID, &poster.Password, &poster.DateJoined)
@@ -208,8 +204,20 @@ func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster Use
 		}
 		comments = append(comments, comment)
 	}
+	users = make(map[xid.ID]User)
+	// TODO: this could also be done with one array filled with posterIDs, then matching returned rows to the comments
 	commenterBatch := &pgx.Batch{}
 	for _, comment := range comments {
+		commenterBatch.Queue(`SELECT * FROM users WHERE id=$1`, comment.PosterID)
+	}
+	commenterBR := p.pool.SendBatch(context.Background(), batch)
+	defer commenterBR.Close()
+	for _, comment := range comments {
+		var user User
+		if err = commenterBR.QueryRow().Scan(&user.Name, &user.ID, &user.Password, &user.DateJoined); err != nil {
+			return
+		}
+		users[comment.ID] = user
 	}
 	return
 }

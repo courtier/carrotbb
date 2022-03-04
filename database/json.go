@@ -124,7 +124,7 @@ func (j *JSONDatabase) AddPost(title, content string, posterID xid.ID) (xid.ID, 
 		ID:          newID,
 		PosterID:    posterID,
 		DateCreated: time.Now(),
-		CommentIDs:  []xid.ID{},
+		CommentIDs:  [][]byte{},
 	}
 	j.Posts = append(j.Posts, newP)
 	return newID, nil
@@ -147,7 +147,7 @@ func (j *JSONDatabase) AddComment(content string, postID, posterID xid.ID) (xid.
 	if err != nil {
 		return newID, err
 	}
-	post.CommentIDs = append(post.CommentIDs, newID)
+	post.CommentIDs = append(post.CommentIDs, newID.Bytes())
 	return newID, nil
 }
 
@@ -248,7 +248,7 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 	comments = make([]Comment, 0)
 	users = make(map[xid.ID]User)
 	for _, cID := range post.CommentIDs {
-		commentP, err := j.GetComment(cID)
+		commentP, err := j.GetComment(xid.Must(xid.FromBytes(cID)))
 		if err != nil {
 			// TODO: Ignore error here or return out of the function?
 			continue

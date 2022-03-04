@@ -27,7 +27,7 @@ const indexPageTemplateStr = `<html lang="en">
 	<ul>
         {{range .Posts}}
         <li>
-			<p><a href="/post/{{.ID}}">{{.Title}}</a> {{len .CommentIDs}} comments, posted at {{.DateCreated.Format "15:04:05 UTC"}} on {{.DateCreated.Format "Jan 02, 2006"}}</p>
+			<p><a href="/post/{{.ID}}">{{.Title}}</a> {{ $length := len .CommentIDs }} {{ if ne $length 1 }} {{ $length }} comments {{else}} 1 comment {{end}}, posted at {{.DateCreated.Format "15:04:05 UTC"}} on {{.DateCreated.Format "Jan 02, 2006"}}</p>
         </li>
         {{end}}
     </ul>

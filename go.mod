@@ -22,4 +22,4 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 )
 
-replace github.com/rs/xid => github.com/courtier/xid v1.3.1
+replace github.com/rs/xid => github.com/courtier/xid v1.3.3

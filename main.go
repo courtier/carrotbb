@@ -70,12 +70,15 @@ func main() {
 func IndexPage(w http.ResponseWriter, r *http.Request) {
 	posts, err := db.AllPosts()
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
 	signedIn, username := extractUsername(r)
-	templates.GenerateIndexPage(w, signedIn, username, posts)
+	if err := templates.GenerateIndexPage(w, signedIn, username, posts); err != nil {
+		log.Println(err)
+	}
 }
 
 func PostPage(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +102,9 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	signedIn, username := extractUsername(r)
-	templates.GeneratePostPage(w, signedIn, username, post, poster, comments, users)
+	if err := templates.GeneratePostPage(w, signedIn, username, post, poster, comments, users); err != nil {
+		log.Println(err)
+	}
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {

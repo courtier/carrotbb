@@ -28,9 +28,9 @@ const postPageTemplateStr = `<html lang="en">
     <p>{{.Post.Content}}</p>
     <hr>
     {{if .Comments}}
-        {{range $comment, $user := .Comments}}
-			<p><b>{{$user.Name}}</b> commented at {{$comment.DateCreated.Format "15:04:05 UTC"}} on {{$comment.DateCreated.Format "Jan 02, 2006"}}<br>
-                {{$comment.Content}}</p>
+        {{range .Comments}}
+			<p><b>{{ with (index $.Users .ID) }}{{ .Name }}{{ end }}</b> commented at {{.DateCreated.Format "15:04:05 UTC"}} on {{.DateCreated.Format "Jan 02, 2006"}}<br>
+                {{.Content}}</p>
             <hr>
         {{end}}
 	{{else}}
@@ -68,6 +68,7 @@ func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post da
 		Post:     post,
 		Poster:   poster,
 		Comments: comments,
+		Users:    users,
 	}
 	return postPageTemplate.Execute(w, data)
 }
