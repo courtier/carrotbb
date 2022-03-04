@@ -1,3 +1,4 @@
+#supported backends: postgres, json
 DB_BACKEND="postgres"
 POSTGRES_URL="postgres://carrot:carrot@localhost:5432/carrotbb"
 JSON_FOLDER_PATH="carrotbb/storage"

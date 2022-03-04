@@ -37,6 +37,7 @@ func GenerateErrorPage(w http.ResponseWriter, args ...string) error {
 	return errorPageTemplate.Execute(w, data)
 }
 
+// TODO: just use sprintf or something
 func intoOneString(args []string) string {
 	var sb strings.Builder
 	for i, s := range args {

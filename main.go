@@ -114,7 +114,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case "GET":
-		templates.ServeSignupTemplate(w, r)
+		templates.GenerateSignupTemplate(w, r.Referer())
 	case "POST":
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -124,6 +124,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		name := r.Form.Get("username")
 		password := r.Form.Get("password")
+		redirect := r.Form.Get("redirect")
 		if err := isUsernameValid(name); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			templates.GenerateErrorPage(w, err.Error())
@@ -155,7 +156,10 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, userID)
-		http.Redirect(w, r, "/", http.StatusFound)
+		if redirect == "" {
+			redirect = "/"
+		}
+		http.Redirect(w, r, redirect, http.StatusFound)
 	default:
 		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -169,7 +173,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case "GET":
-		templates.ServeSigninTemplate(w, r)
+		templates.GenerateSigninTemplate(w, r.Referer())
 	case "POST":
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -179,6 +183,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		name := r.Form.Get("username")
 		password := r.Form.Get("password")
+		redirect := r.Form.Get("redirect")
 		hashedP := saltAndHash(password, name)
 		user, err := db.FindUserByName(name)
 		if err != nil {
@@ -204,7 +209,10 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		authenticateUser(w, token, user.ID)
-		http.Redirect(w, r, "/", http.StatusFound)
+		if redirect == "" {
+			redirect = "/"
+		}
+		http.Redirect(w, r, redirect, http.StatusFound)
 	default:
 		w.Header().Add("Allow", "GET, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -226,7 +234,11 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	unauthenticateUser(w, token)
-	http.Redirect(w, r, "/", http.StatusFound)
+	var redirect string
+	if redirect = r.Referer(); redirect == "" {
+		redirect = "/"
+	}
+	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
 func CreatePostHandler(w http.ResponseWriter, r *http.Request) {

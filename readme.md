@@ -11,18 +11,16 @@ bulletin board
     - nice to have in the future: mongodb, sqlite
 
 ## immediate todos
-- clean up auth.go (delete functions)
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
 - store session token hashes in database
-- sort comments by their creation date
-- redirect to referer
+- logging
+- https support
 
 ## long term todos
 - csrf tokens
 - more tests
 - css
-- logging
 - paging posts and comments
 
 ## nice to haves for the future
@@ -33,8 +31,9 @@ bulletin board
 - docker file
 
 ## notes
-- forked xid to work with pgx without any type conversions
+- forked xid to work with pgx without any hiccups
     - https://github.com/courtier/xid
+        - todo: needs an array type
 
 ## setting up
 - postgres:

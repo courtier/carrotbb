@@ -1,11 +1,11 @@
 package templates
 
 import (
-	"fmt"
+	"html/template"
 	"net/http"
 )
 
-const signupTemplate = `<html lang="en">
+const signupTemplateStr = `<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -21,17 +21,27 @@ const signupTemplate = `<html lang="en">
         <input type="text" id="username" name="username" placeholder="carrot"><br>
         <label for="password">Password</label><br>
         <input type="password" id="password" name="password"><br><br>
+        <input type="hidden" id="redirect" name="redirect" value="{{ .Redirect }}">
         <input type="submit" value="Submit">
     </form>
 </body>
 
 </html>`
 
-func GenerateSignupPage() string {
-	return signupTemplate
+type SignupTemplateData struct {
+	Redirect string
 }
 
-func ServeSignupTemplate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, signupTemplate)
+var (
+	signupTemplate = template.Must(template.New("signupTemplate").Parse(signupTemplateStr))
+)
+
+func GenerateSignupTemplate(w http.ResponseWriter, referer string) error {
+	if referer == "" {
+		referer = "/"
+	}
+	data := SignupTemplateData{
+		Redirect: referer,
+	}
+	return signupTemplate.Execute(w, data)
 }
