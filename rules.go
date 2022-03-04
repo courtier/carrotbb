@@ -13,7 +13,7 @@ var (
 	ErrPasswordBadLength = errors.New("password must be between 1 and 144 characters")
 )
 
-// Length must be between 1 and 24 chars, only letters, numbers and underscores
+// isUsernameValid checks: 1 <= length <= 24, only letters, numbers and underscores
 func isUsernameValid(name string) error {
 	if len(name) < 1 || len(name) > 24 {
 		return ErrNameBadLength
@@ -26,6 +26,7 @@ func isUsernameValid(name string) error {
 	return nil
 }
 
+// isTitleValid checks: 1 <= length <= 64
 func isTitleValid(content string) error {
 	if len(content) < 1 || len(content) > 64 {
 		return ErrTitleBadLength
@@ -33,6 +34,7 @@ func isTitleValid(content string) error {
 	return nil
 }
 
+// isContentValid checks: 1 <= length <= 65535
 func isContentValid(content string) error {
 	if len(content) < 1 || len(content) > 65535 {
 		return ErrContentBadLength
@@ -40,6 +42,7 @@ func isContentValid(content string) error {
 	return nil
 }
 
+// isPasswordValid checks: 1 <= length <= 144
 func isPasswordValid(password string) error {
 	if len(password) < 1 || len(password) > 144 {
 		return ErrPasswordBadLength

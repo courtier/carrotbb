@@ -25,7 +25,7 @@ func TestSaltAndHash(t *testing.T) {
 
 func TestExtractSession(t *testing.T) {
 	sessionToken := "token"
-	sessionCache[sessionToken] = session{expiry: time.Now().Add(10 * time.Second)}
+	sessionCache.Write(sessionToken, session{expiry: time.Now().Add(10 * time.Second)})
 	r, err := http.NewRequest("GET", "/signup", nil)
 	if err != nil {
 		t.Fatal(err)

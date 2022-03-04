@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/courtier/carrotbb/database"
@@ -24,9 +25,41 @@ var (
 	ErrRandReadUnmatched = errors.New("rand read less bytes than required")
 )
 
+type MapCache struct {
+	cache map[string]session
+	lock  sync.RWMutex
+}
+
 var (
-	sessionCache = make(map[string]session)
+	sessionCache = &MapCache{
+		cache: make(map[string]session),
+	}
 )
+
+func (m *MapCache) ReadOK(key string) (session, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	s, ok := m.cache[key]
+	return s, ok
+}
+
+func (m *MapCache) Read(key string) session {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.cache[key]
+}
+
+func (m *MapCache) Write(key string, value session) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.cache[key] = value
+}
+
+func (m *MapCache) Delete(key string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	delete(m.cache, key)
+}
 
 type session struct {
 	userID xid.ID
@@ -77,7 +110,7 @@ func extractSession(r *http.Request) (token string, err error) {
 		return
 	}
 	token = c.Value
-	_, ok := sessionCache[token]
+	_, ok := sessionCache.ReadOK(token)
 	if !ok {
 		err = ErrSessionNotCached
 	}
@@ -90,7 +123,7 @@ func isRequestAuthenticatedSimple(r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	return !sessionCache[token].isExpired()
+	return !sessionCache.Read(token).isExpired()
 }
 
 // extractUser extracts the user if authenticated from a request
@@ -100,7 +133,7 @@ func extractUser(r *http.Request) (user database.User, err error) {
 		return
 	}
 	token := c.Value
-	sesh, ok := sessionCache[token]
+	sesh, ok := sessionCache.ReadOK(token)
 	if !ok {
 		err = ErrSessionNotCached
 		return
@@ -131,7 +164,7 @@ func NewAuthMiddleware(handler http.Handler) *AuthMiddleware {
 
 func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token, err := extractSession(r)
-	if err == nil && sessionCache[token].isExpired() {
+	if err == nil && sessionCache.Read(token).isExpired() {
 		unauthenticateUser(w, token)
 	}
 	a.handler.ServeHTTP(w, r)
@@ -139,10 +172,10 @@ func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // authenticateUser puts the token and session in the cache and sets the cookie
 func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
-	sessionCache[token] = session{
+	sessionCache.Write(token, session{
 		userID: userID,
 		expiry: time.Now().Add(DEFAULT_SESSION_EXPIRY),
-	}
+	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    token,
@@ -154,7 +187,7 @@ func authenticateUser(w http.ResponseWriter, token string, userID xid.ID) {
 
 // unauthenticateUser removes the token and session from the cache and removes the cookie
 func unauthenticateUser(w http.ResponseWriter, token string) {
-	delete(sessionCache, token)
+	sessionCache.Delete(token)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    "",
