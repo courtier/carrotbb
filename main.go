@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,14 +73,14 @@ func main() {
 
 	if httpPort != "" {
 		go func() {
-			log.Println("listening http on port", httpPort)
-			log.Fatal(http.ListenAndServe(httpPort, logger))
+			zapper.Info("listening http", zap.String("port", httpPort))
+			zapper.Fatal("http error", zap.Error(http.ListenAndServe(httpPort, logger)))
 		}()
 	}
 	if httpsPort != "" {
 		go func() {
-			log.Println("listening https on port", httpsPort)
-			log.Fatal(http.ListenAndServeTLS(httpsPort, certFile, keyFile, logger))
+			zapper.Info("listening https", zap.String("port", httpsPort))
+			zapper.Fatal("https error", zap.Error(http.ListenAndServeTLS(httpsPort, certFile, keyFile, logger)))
 		}()
 	}
 
