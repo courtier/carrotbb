@@ -9,8 +9,7 @@ bulletin board
     - supported: json (very slow, for prototyping only), postgresql
 
 ## immediate todos
-- more tests
-- logging
+- dockerfile
 
 ## long term todos
 - ability to delete posts, comments, accounts
@@ -23,8 +22,6 @@ bulletin board
 - image embeds
 - quoting other comments
 - moderation system
-- cache for served content
-- docker file
 - mongodb, sqlite backends
 
 ## notes

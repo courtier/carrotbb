@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	db database.Database
+	db     database.Database
+	zapper *zap.Logger
 )
 
 func main() {
@@ -46,7 +47,7 @@ func main() {
 	}
 	defer func() {
 		if err := db.Disconnect(); err != nil {
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 		}
 	}()
 
@@ -61,7 +62,7 @@ func main() {
 
 	auther := NewAuthMiddleware(mux)
 
-	zapper, err := zap.NewProduction()
+	zapper, err = zap.NewProduction()
 	if err != nil {
 		panic(err)
 	}
@@ -90,14 +91,14 @@ func main() {
 func IndexPage(w http.ResponseWriter, r *http.Request) {
 	posts, err := db.AllPosts()
 	if err != nil {
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
 	signedIn, username := extractUsername(r)
 	if err := templates.GenerateIndexPage(w, signedIn, username, posts); err != nil {
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 	}
 }
 
@@ -118,12 +119,12 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		templates.GenerateErrorPage(w, "error while fetching the post")
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		return
 	}
 	signedIn, username := extractUsername(r)
 	if err := templates.GeneratePostPage(w, signedIn, username, post, poster, comments, users); err != nil {
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 	}
 }
 
@@ -139,7 +140,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			templates.GenerateErrorPage(w, "error parsing form")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		name := r.Form.Get("username")
@@ -165,14 +166,14 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error during signup")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		token, err := newRandomToken()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error generating session token")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		authenticateUser(w, token, userID)
@@ -198,7 +199,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			templates.GenerateErrorPage(w, "error parsing form")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		name := r.Form.Get("username")
@@ -213,7 +214,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
 			templates.GenerateErrorPage(w, "error finding that username")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		if hashedP != user.Password {
@@ -225,7 +226,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error generating session token")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		authenticateUser(w, token, user.ID)
@@ -250,7 +251,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, "error logging out")
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		return
 	}
 	unauthenticateUser(w, token)
@@ -273,7 +274,7 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			templates.GenerateErrorPage(w, "error parsing form")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		title := r.Form.Get("title")
@@ -292,14 +293,14 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error extracting user")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		postID, err := db.AddPost(title, content, user.ID)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error creating post")
-			log.Println(err)
+			zapper.Error("error", zap.Error(err))
 			return
 		}
 		http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
@@ -322,7 +323,7 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		templates.GenerateErrorPage(w, "error parsing form")
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		return
 	}
 	postIDString := r.Form.Get("postID")
@@ -342,14 +343,14 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, "error extracting user")
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		return
 	}
 	_, err = db.AddComment(content, postID, user.ID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, "error creating comment")
-		log.Println(err)
+		zapper.Error("error", zap.Error(err))
 		return
 	}
 	http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
