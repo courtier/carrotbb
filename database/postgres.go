@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"log"
 	"os"
@@ -16,31 +17,8 @@ var (
 	ErrMistmatchedRowsAffected = errors.New("errors affected does not match desired number")
 )
 
-const CREATE_POSTS_TABLE = `CREATE TABLE IF NOT EXISTS posts (
-	title			text,
-	content			text,
-	poster_id		text,
-	id				text PRIMARY KEY,
-	comment_ids		text ARRAY,
-	date_created	timestamp
-);`
-
-const CREATE_COMMENTS_TABLE = `CREATE TABLE IF NOT EXISTS comments (
-	content			text,
-	post_id			text,
-	poster_id		text,
-	id				text PRIMARY KEY,
-	date_created	timestamp
-);`
-
-const CREATE_USERS_TABLE = `CREATE TABLE IF NOT EXISTS users (
-	name			text UNIQUE,
-	id				text,
-	password		text PRIMARY KEY,
-	date_joined		timestamp
-);`
-
-var createTables = []string{CREATE_POSTS_TABLE, CREATE_COMMENTS_TABLE, CREATE_USERS_TABLE}
+//go:embed create_tables.sql
+var createTables string
 
 type PostgresDatabase struct {
 	pool *pgxpool.Pool
@@ -52,12 +30,10 @@ func ConnectPostgres() (db *PostgresDatabase, err error) {
 		return nil, err
 	}
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		for _, statement := range createTables {
-			_, err := conn.Exec(ctx, statement)
-			if err != nil {
-				log.Fatalln(err)
-				return err
-			}
+		_, err := conn.Exec(ctx, createTables)
+		if err != nil {
+			log.Fatalln(err)
+			return err
 		}
 		return nil
 	}
