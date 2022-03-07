@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -25,7 +26,7 @@ type PostgresDatabase struct {
 }
 
 func ConnectPostgres() (db *PostgresDatabase, err error) {
-	config, err := pgxpool.ParseConfig(os.Getenv("POSTGRES_URL"))
+	config, err := pgxpool.ParseConfig(buildPostgresURL())
 	if err != nil {
 		return nil, err
 	}
@@ -198,4 +199,8 @@ func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster Use
 		users[comment.ID] = user
 	}
 	return
+}
+
+func buildPostgresURL() string {
+	return fmt.Sprintf("postgres://%s:%s@localhost:5432/%s", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_DB"))
 }

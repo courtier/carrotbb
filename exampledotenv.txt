@@ -1,6 +1,8 @@
 #supported backends: postgres, json
 DB_BACKEND="postgres"
-POSTGRES_URL="postgres://carrot:carrot@localhost:5432/carrotbb"
+POSTGRES_USER="carrot"
+POSTGRES_PASSWORD="carrot"
+POSTGRES_DB="carrotbb"
 JSON_FOLDER_PATH="carrotbb/storage"
 JSON_FILE_NAME="database.json"
 #Leave empty to disable
