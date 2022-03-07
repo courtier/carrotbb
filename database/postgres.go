@@ -40,13 +40,7 @@ const CREATE_USERS_TABLE = `CREATE TABLE IF NOT EXISTS users (
 	date_joined		timestamp
 );`
 
-const CREATE_SESSIONS_TABLE = `CREATE TABLE IF NOT EXISTS sessions (
-	hash			text PRIMARY KEY,
-	user_id			text,
-	expiry			timestamp
-);`
-
-var createTables = []string{CREATE_POSTS_TABLE, CREATE_COMMENTS_TABLE, CREATE_USERS_TABLE, CREATE_SESSIONS_TABLE}
+var createTables = []string{CREATE_POSTS_TABLE, CREATE_COMMENTS_TABLE, CREATE_USERS_TABLE}
 
 type PostgresDatabase struct {
 	pool *pgxpool.Pool
@@ -127,10 +121,6 @@ func (p *PostgresDatabase) AddUser(name, password string) (id xid.ID, err error)
 	return
 }
 
-func (p *PostgresDatabase) AddSession(tokenHash string, userID xid.ID, expiry time.Time) (err error) {
-	return
-}
-
 func (p *PostgresDatabase) GetPost(id xid.ID) (post Post, err error) {
 	err = p.pool.QueryRow(context.Background(),
 		`SELECT * FROM posts WHERE id=$1`, id).
@@ -159,6 +149,7 @@ func (p *PostgresDatabase) FindUserByName(name string) (user User, err error) {
 	return
 }
 
+// TODO: paging
 func (p *PostgresDatabase) AllPosts() (posts []Post, err error) {
 	rows, err := p.pool.Query(context.TODO(), "SELECT * FROM posts")
 	if err != nil {
@@ -205,7 +196,6 @@ func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster Use
 		comments = append(comments, comment)
 	}
 	users = make(map[xid.ID]User)
-	// TODO: this could also be done with one array filled with posterIDs, then matching returned rows to the comments
 	commenterBatch := &pgx.Batch{}
 	for _, comment := range comments {
 		commenterBatch.Queue(`SELECT * FROM users WHERE id=$1`, comment.PosterID)
