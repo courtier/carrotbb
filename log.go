@@ -21,5 +21,6 @@ func (l *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.handler.ServeHTTP(w, r)
 	l.logger.Info("served request",
 		zap.Int64("duration", time.Since(begin).Milliseconds()),
-		zap.String("path", r.URL.Path))
+		zap.String("path", r.URL.Path),
+		zap.String("method", r.Method))
 }

@@ -12,7 +12,7 @@ var (
 	ErrNoPostFoundByID            = errors.New("no matching post id found")
 	ErrNoCommentFoundByID         = errors.New("no matching comment id found")
 	ErrNoUserFoundByID            = errors.New("no matching user id found")
-	ErrUsernameNotFound           = errors.New("no matching user name found")
+	ErrNoUserFoundByName          = errors.New("no matching user name found")
 )
 
 type Database interface {

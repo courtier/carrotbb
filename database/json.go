@@ -204,7 +204,7 @@ func (j *JSONDatabase) FindUserByName(name string) (User, error) {
 			return j.Users[n], nil
 		}
 	}
-	return User{}, ErrUsernameNotFound
+	return User{}, ErrNoUserFoundByName
 }
 
 func (j *JSONDatabase) AllPosts() ([]Post, error) {

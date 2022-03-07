@@ -101,6 +101,9 @@ func (p *PostgresDatabase) GetPost(id xid.ID) (post Post, err error) {
 	err = p.pool.QueryRow(context.Background(),
 		`SELECT * FROM posts WHERE id=$1`, id).
 		Scan(&post.Title, &post.Content, &post.PosterID, &post.ID, &post.CommentIDs, &post.DateCreated)
+	if err == pgx.ErrNoRows {
+		err = ErrNoPostFoundByID
+	}
 	return
 }
 
@@ -108,6 +111,9 @@ func (p *PostgresDatabase) GetComment(id xid.ID) (comment Comment, err error) {
 	err = p.pool.QueryRow(context.Background(),
 		`SELECT * FROM comments WHERE id=$1`, id).
 		Scan(&comment.Content, &comment.PostID, &comment.PosterID, &comment.ID, &comment.DateCreated)
+	if err == pgx.ErrNoRows {
+		err = ErrNoCommentFoundByID
+	}
 	return
 }
 
@@ -115,6 +121,9 @@ func (p *PostgresDatabase) GetUser(id xid.ID) (user User, err error) {
 	err = p.pool.QueryRow(context.Background(),
 		`SELECT * FROM users WHERE id=$1`, id).
 		Scan(&user.Name, &user.ID, &user.Password, &user.DateJoined)
+	if err == pgx.ErrNoRows {
+		err = ErrNoUserFoundByID
+	}
 	return
 }
 
@@ -122,6 +131,9 @@ func (p *PostgresDatabase) FindUserByName(name string) (user User, err error) {
 	err = p.pool.QueryRow(context.Background(),
 		`SELECT * FROM users WHERE name=$1`, name).
 		Scan(&user.Name, &user.ID, &user.Password, &user.DateJoined)
+	if err == pgx.ErrNoRows {
+		err = ErrNoUserFoundByName
+	}
 	return
 }
 

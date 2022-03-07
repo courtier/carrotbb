@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -32,6 +34,7 @@ func main() {
 	httpsPort := os.Getenv("HTTPS_PORT")
 	certFile := os.Getenv("SSL_CERT_FILE")
 	keyFile := os.Getenv("SSL_KEY_FILE")
+	domain := os.Getenv("DOMAIN")
 
 	if httpPort != "" && httpPort[0] != ':' {
 		httpPort = ":" + httpPort
@@ -78,9 +81,23 @@ func main() {
 		}()
 	}
 	if httpsPort != "" {
+		certManager := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			Cache:      autocert.DirCache("/cert-cache"),
+			HostPolicy: autocert.HostWhitelist(domain),
+		}
+
+		server := &http.Server{
+			Addr:    httpsPort,
+			Handler: logger,
+			TLSConfig: &tls.Config{
+				GetCertificate: certManager.GetCertificate,
+			},
+		}
+
 		go func() {
 			zapper.Info("listening https", zap.String("port", httpsPort))
-			zapper.Fatal("https error", zap.Error(http.ListenAndServeTLS(httpsPort, certFile, keyFile, logger)))
+			zapper.Fatal("https error", zap.Error(server.ListenAndServeTLS(certFile, keyFile)))
 		}()
 	}
 
@@ -207,7 +224,7 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		hashedP := saltAndHash(password, name)
 		user, err := db.FindUserByName(name)
 		if err != nil {
-			if err == database.ErrUsernameNotFound {
+			if err == database.ErrNoUserFoundByName {
 				w.WriteHeader(http.StatusNotFound)
 			} else {
 				w.WriteHeader(http.StatusInternalServerError)
