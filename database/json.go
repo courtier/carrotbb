@@ -230,19 +230,14 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 	if err != nil {
 		return
 	}
-	comments = make([]Comment, 0)
-	users = make(map[xid.ID]User)
-	for _, cID := range post.CommentIDs {
-		commentP, err := j.GetComment(xid.Must(xid.FromBytes(cID)))
-		if err != nil {
-			// TODO: Ignore error here or return out of the function?
-			continue
-		}
-		comments = append(comments, commentP)
+	comments, err = j.AllCommentsUnderPost(postID)
+	if err != nil {
+		return
 	}
 	sort.Slice(comments, func(i, j int) bool {
 		return comments[i].DateCreated.Before(comments[j].DateCreated)
 	})
+	users = make(map[xid.ID]User)
 	for _, comment := range comments {
 		commenterP, err := j.GetUser(comment.PosterID)
 		if err != nil {

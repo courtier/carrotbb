@@ -16,7 +16,7 @@ const profilePageTemplateStr = `<html lang="en">
 
 <body>
     {{if .User.OK}}
-    <p>carrotbb - logged in as <a href="/self">{{.User.User.Name}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
+    <p><a href="/">carrotbb</a> - logged in as <a href="/self">{{.User.User.Name}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
 	<p>You have created <b>TODO</b> posts.</p>
 	<p>You have left <b>TODO</b> comments.</p>
     {{else}}
