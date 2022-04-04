@@ -158,7 +158,7 @@ func (p *PostgresDatabase) AllPosts() (posts []Post, err error) {
 }
 
 func (p *PostgresDatabase) PagePosts(start, end int) (posts []Post, err error) {
-	rows, err := p.pool.Query(context.TODO(), "SELECT * FROM posts LIMIT $1 OFFSET $2", end-start, start)
+	rows, err := p.pool.Query(context.TODO(), "SELECT * FROM posts ORDER BY date_created DESC LIMIT $1 OFFSET $2", end-start, start)
 	if err != nil {
 		return
 	}
