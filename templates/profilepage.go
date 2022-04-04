@@ -34,6 +34,7 @@ var (
 	profilePageTemplate = template.Must(template.New("profilePageTemplate").Parse(profilePageTemplateStr))
 )
 
+// TODO: add links to all created posts, and comments
 func GenerateProfilePage(w http.ResponseWriter, user Profile) error {
 	data := ProfilePageTemplateData{
 		User: user,

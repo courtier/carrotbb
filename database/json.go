@@ -81,7 +81,7 @@ func ConnectJSON(saveInterval time.Duration) (*JSONDatabase, error) {
 }
 
 func (j *JSONDatabase) saveDatabase() error {
-	jsonFile, err := os.OpenFile(j.backingPath, os.O_WRONLY|os.O_TRUNC, 0644)
+	jsonFile, err := os.OpenFile(j.backingPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (j *JSONDatabase) saveDatabase() error {
 }
 
 func (j *JSONDatabase) Disconnect() error {
-	// TODO: there has to be a race condition here fosho
+	// TODO: there has to be a race condition here for sure
 	// j.postsLock.Lock()
 	// j.commentsLock.Lock()
 	// j.usersLock.Lock()
@@ -254,9 +254,15 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 	return
 }
 
-// TODO: make this actually page posts
 func (j *JSONDatabase) PagePosts(start, end int) ([]Post, error) {
-	return nil, nil
+	// check bounds
+	if start < 0 {
+		start = 0
+	}
+	if end > len(j.Posts) {
+		end = len(j.Posts)
+	}
+	return j.Posts[start:end], nil
 }
 
 func sortSliceByDate(slice interface{}) {
