@@ -254,6 +254,11 @@ func (j *JSONDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, c
 	return
 }
 
+// TODO: make this actually page posts
+func (j *JSONDatabase) PagePosts(start, end int) ([]Post, error) {
+	return nil, nil
+}
+
 func sortSliceByDate(slice interface{}) {
 	switch v := slice.(type) {
 	case []Post:

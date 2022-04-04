@@ -35,6 +35,9 @@ type Database interface {
 	// AllPosts returns all the posts in the database
 	AllPosts() ([]Post, error)
 
+	// PagePosts returns posts [start, end)
+	PagePosts(start, end int) ([]Post, error)
+
 	// GetPostPageData returns all the data necessary to render a post page
 	GetPostPageData(postID xid.ID) (Post, User, []Comment, map[xid.ID]User, error)
 

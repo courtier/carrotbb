@@ -157,6 +157,24 @@ func (p *PostgresDatabase) AllPosts() (posts []Post, err error) {
 	return
 }
 
+func (p *PostgresDatabase) PagePosts(start, end int) (posts []Post, err error) {
+	rows, err := p.pool.Query(context.TODO(), "SELECT * FROM posts LIMIT $1 OFFSET $2", end-start, start)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var post Post
+		err = rows.Scan(&post.Title, &post.Content, &post.PosterID, &post.ID, &post.CommentIDs, &post.DateCreated)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		posts = append(posts, post)
+	}
+	return
+}
+
 func (p *PostgresDatabase) GetPostPageData(postID xid.ID) (post Post, poster User, comments []Comment, users map[xid.ID]User, err error) {
 	post, err = p.GetPost(postID)
 	if err != nil {
