@@ -70,9 +70,8 @@ func main() {
 	mux.HandleFunc("/signup", SignupHandler)
 	mux.HandleFunc("/signin", SigninHandler)
 	mux.HandleFunc("/logout", LogoutHandler)
-	// TODO:
-	// mux.HandleFunc("/self", ProfilePageHandler)
-	// mux.HandleFunc("/user", ProfilePageHandler)
+	mux.HandleFunc("/self", ProfilePageHandler)
+	mux.HandleFunc("/user", ProfilePageHandler)
 
 	auther := NewAuthMiddleware(mux)
 	logger := NewLoggerMiddleware(auther, zapper)
@@ -372,50 +371,50 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
 }
 
-// TODO:
-// func ProfilePageHandler(w http.ResponseWriter, r *http.Request) {
-// 	if !isRequestAuthenticatedSimple(r) && r.URL.EscapedPath() == "/self" {
-// 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-// 		return
-// 	}
-// 	// TODO: add POST for editing profile
-// 	if r.Method != "GET" {
-// 		w.Header().Add("Allow", "GET")
-// 		w.WriteHeader(http.StatusMethodNotAllowed)
-// 		return
-// 	}
-// 	var user database.User
-// 	var err error
-// 	if r.URL.EscapedPath() == "/self" {
-// 		user, err = extractUser(r)
-// 	} else {
-// 		pathSplit := pathIntoArray(r.URL.EscapedPath())
-// 		if len(pathSplit) != 2 || pathSplit[0] != "user" {
-// 			w.WriteHeader(http.StatusBadRequest)
-// 			templates.GenerateErrorPage(w, "malformed request path")
-// 			zapper.Error("error", zap.Error(err))
-// 			return
-// 		}
-// 		var userID xid.ID
-// 		userID, err = xid.FromString(pathSplit[1])
-// 		if err != nil {
-// 			w.WriteHeader(http.StatusBadRequest)
-// 			templates.GenerateErrorPage(w, "malformed user id")
-// 			zapper.Error("error", zap.Error(err))
-// 			return
-// 		}
-// 		user, err = db.GetUser(userID)
-// 	}
-// 	if err != nil {
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		templates.GenerateErrorPage(w, "error getting user")
-// 		zapper.Error("error", zap.Error(err))
-// 		return
-// 	}
-// 	if err = templates.GenerateProfilePage(w, user); err != nil {
-// 		zapper.Error("error", zap.Error(err))
-// 	}
-// }
+func ProfilePageHandler(w http.ResponseWriter, r *http.Request) {
+	if !profileFromCtx(r.Context()).OK && r.URL.EscapedPath() == "/self" {
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	// TODO: add POST for editing profile
+	if r.Method != "GET" {
+		w.Header().Add("Allow", "GET")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var user templates.Profile
+	var err error
+	if r.URL.EscapedPath() == "/self" {
+		user = profileFromCtx(r.Context())
+	} else {
+		pathSplit := pathIntoArray(r.URL.EscapedPath())
+		if len(pathSplit) != 2 || pathSplit[0] != "user" {
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, "malformed request path")
+			zapper.Error("error", zap.Error(err))
+			return
+		}
+		var userID xid.ID
+		userID, err = xid.FromString(pathSplit[1])
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			templates.GenerateErrorPage(w, "malformed user id")
+			zapper.Error("error", zap.Error(err))
+			return
+		}
+		dbUser, err := db.GetUser(userID)
+		user = templates.Profile{User: dbUser, OK: err == nil}
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		templates.GenerateErrorPage(w, "error getting user")
+		zapper.Error("error", zap.Error(err))
+		return
+	}
+	if err = templates.GenerateProfilePage(w, user); err != nil {
+		zapper.Error("error", zap.Error(err))
+	}
+}
 
 func pathIntoArray(path string) []string {
 	if path == "" {

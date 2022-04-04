@@ -3,8 +3,6 @@ package templates
 import (
 	"html/template"
 	"net/http"
-
-	"github.com/courtier/carrotbb/database"
 )
 
 const profilePageTemplateStr = `<html lang="en">
@@ -17,36 +15,26 @@ const profilePageTemplateStr = `<html lang="en">
 </head>
 
 <body>
-    {{if .SignedIn}}
-    <p>carrotbb - logged in as <a href="/self">{{.Username}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
+    {{if .User.OK}}
+    <p>carrotbb - logged in as <a href="/self">{{.User.User.Name}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
+	<p>You have created <b>TODO</b> posts.</p>
+	<p>You have left <b>TODO</b> comments.</p>
     {{else}}
     <p>carrotbb - <a href="/signup">sign up</a> <a href="/signin">sign in</a></p>
     {{end}}
-	{{if .Posts}}
-	<h3>posts</h3>
-	<ul>
-        {{range .Posts}}
-        <li>
-			<p><a href="/post/{{.ID}}">{{.Title}}</a> {{ $length := len .CommentIDs }} {{ if ne $length 1 }} {{ $length }} comments {{else}} 1 comment {{end}}, posted at {{.DateCreated.Format "15:04:05 UTC"}} on {{.DateCreated.Format "Jan 02, 2006"}}</p>
-        </li>
-        {{end}}
-    </ul>
-	{{else}}
-	<h3>no posts found.</h3>
-	{{end}}
 </body>
 
 </html>`
 
 type ProfilePageTemplateData struct {
-	User database.User
+	User Profile
 }
 
 var (
 	profilePageTemplate = template.Must(template.New("profilePageTemplate").Parse(profilePageTemplateStr))
 )
 
-func GenerateProfilePage(w http.ResponseWriter, user database.User) error {
+func GenerateProfilePage(w http.ResponseWriter, user Profile) error {
 	data := ProfilePageTemplateData{
 		User: user,
 	}
