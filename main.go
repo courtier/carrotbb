@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 	"os"
@@ -29,6 +30,12 @@ func main() {
 		panic(err)
 	}
 
+	zapper, err = zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	defer zapper.Sync()
+
 	dbBackend := os.Getenv("DB_BACKEND")
 	httpPort := os.Getenv("HTTP_PORT")
 	httpsPort := os.Getenv("HTTPS_PORT")
@@ -53,22 +60,21 @@ func main() {
 		}
 	}()
 
+	zapper.Info("connected to database", zap.String("backend", dbBackend))
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", IndexPage)
+	mux.HandleFunc("/", IndexPageHandler)
 	mux.HandleFunc("/createpost", CreatePostHandler)
-	mux.HandleFunc("/post/", PostPage)
+	mux.HandleFunc("/post/", PostPageHandler)
 	mux.HandleFunc("/createcomment", CreateCommentHandler)
 	mux.HandleFunc("/signup", SignupHandler)
 	mux.HandleFunc("/signin", SigninHandler)
 	mux.HandleFunc("/logout", LogoutHandler)
+	// TODO:
+	// mux.HandleFunc("/self", ProfilePageHandler)
+	// mux.HandleFunc("/user", ProfilePageHandler)
 
 	auther := NewAuthMiddleware(mux)
-
-	zapper, err = zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
-	defer zapper.Sync()
 	logger := NewLoggerMiddleware(auther, zapper)
 
 	terminate := make(chan os.Signal, 1)
@@ -104,21 +110,20 @@ func main() {
 	<-terminate
 }
 
-func IndexPage(w http.ResponseWriter, r *http.Request) {
-	posts, err := db.AllPosts()
+func IndexPageHandler(w http.ResponseWriter, r *http.Request) {
+	posts, err := db.PagePosts(0, 50)
 	if err != nil {
 		zapper.Error("error", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, err.Error())
 		return
 	}
-	signedIn, username := extractUsername(r)
-	if err := templates.GenerateIndexPage(w, signedIn, username, posts); err != nil {
+	if err := templates.GenerateIndexPage(w, profileFromCtx(r.Context()), posts); err != nil {
 		zapper.Error("error", zap.Error(err))
 	}
 }
 
-func PostPage(w http.ResponseWriter, r *http.Request) {
+func PostPageHandler(w http.ResponseWriter, r *http.Request) {
 	pathSplit := pathIntoArray(r.URL.EscapedPath())
 	if len(pathSplit) != 2 || pathSplit[0] != "post" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -138,20 +143,21 @@ func PostPage(w http.ResponseWriter, r *http.Request) {
 		zapper.Error("error", zap.Error(err))
 		return
 	}
-	signedIn, username := extractUsername(r)
-	if err := templates.GeneratePostPage(w, signedIn, username, post, poster, comments, users); err != nil {
+	if err := templates.GeneratePostPage(w, profileFromCtx(r.Context()), post, poster, comments, users); err != nil {
 		zapper.Error("error", zap.Error(err))
 	}
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	if isRequestAuthenticatedSimple(r) {
+	if profileFromCtx(r.Context()).OK {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
 	case "GET":
-		templates.GenerateSignupTemplate(w, r.Referer())
+		if err := templates.GenerateSignupTemplate(w, r.Referer()); err != nil {
+			zapper.Error("error", zap.Error(err))
+		}
 	case "POST":
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -204,7 +210,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SigninHandler(w http.ResponseWriter, r *http.Request) {
-	if isRequestAuthenticatedSimple(r) {
+	if profileFromCtx(r.Context()).OK {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -259,12 +265,15 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 // TODO: if the session cookie is old and is not in cache
 // and we log in again, this will return unauthorized
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	if !isRequestAuthenticatedSimple(r) {
+	if !profileFromCtx(r.Context()).OK {
 		http.Redirect(w, r, "/", http.StatusUnauthorized)
 		return
 	}
-	token, err := extractSession(r)
+	token, err := extractSessionToken(r)
 	if err != nil {
+		// This is an internal server error, because we have already
+		// checked if the user is authenticated and yet we cannot
+		// extract the session token....
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, "error logging out")
 		zapper.Error("error", zap.Error(err))
@@ -279,13 +288,13 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
-	if !isRequestAuthenticatedSimple(r) {
+	if !profileFromCtx(r.Context()).OK {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.Method {
 	case "GET":
-		templates.ServeCreatePostTemplate(w, r)
+		templates.ServeCreatePostTemplate(w)
 	case "POST":
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -305,14 +314,9 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 			templates.GenerateErrorPage(w, err.Error())
 			return
 		}
-		user, err := extractUser(r)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			templates.GenerateErrorPage(w, "error extracting user")
-			zapper.Error("error", zap.Error(err))
-			return
-		}
-		postID, err := db.AddPost(title, content, user.ID)
+		// This has to be OK as we  already check for it.
+		profile := profileFromCtx(r.Context())
+		postID, err := db.AddPost(title, content, profile.User.ID)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			templates.GenerateErrorPage(w, "error creating post")
@@ -327,7 +331,7 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
-	if !isRequestAuthenticatedSimple(r) {
+	if !profileFromCtx(r.Context()).OK {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -353,16 +357,12 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if err := isContentValid(content); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		templates.GenerateErrorPage(w, err.Error())
-		return
-	}
-	user, err := extractUser(r)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		templates.GenerateErrorPage(w, "error extracting user")
 		zapper.Error("error", zap.Error(err))
 		return
 	}
-	_, err = db.AddComment(content, postID, user.ID)
+	// Has to be OK.
+	profile := profileFromCtx(r.Context())
+	_, err = db.AddComment(content, postID, profile.User.ID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		templates.GenerateErrorPage(w, "error creating comment")
@@ -371,6 +371,51 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, "/post/"+postID.String(), http.StatusFound)
 }
+
+// TODO:
+// func ProfilePageHandler(w http.ResponseWriter, r *http.Request) {
+// 	if !isRequestAuthenticatedSimple(r) && r.URL.EscapedPath() == "/self" {
+// 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+// 		return
+// 	}
+// 	// TODO: add POST for editing profile
+// 	if r.Method != "GET" {
+// 		w.Header().Add("Allow", "GET")
+// 		w.WriteHeader(http.StatusMethodNotAllowed)
+// 		return
+// 	}
+// 	var user database.User
+// 	var err error
+// 	if r.URL.EscapedPath() == "/self" {
+// 		user, err = extractUser(r)
+// 	} else {
+// 		pathSplit := pathIntoArray(r.URL.EscapedPath())
+// 		if len(pathSplit) != 2 || pathSplit[0] != "user" {
+// 			w.WriteHeader(http.StatusBadRequest)
+// 			templates.GenerateErrorPage(w, "malformed request path")
+// 			zapper.Error("error", zap.Error(err))
+// 			return
+// 		}
+// 		var userID xid.ID
+// 		userID, err = xid.FromString(pathSplit[1])
+// 		if err != nil {
+// 			w.WriteHeader(http.StatusBadRequest)
+// 			templates.GenerateErrorPage(w, "malformed user id")
+// 			zapper.Error("error", zap.Error(err))
+// 			return
+// 		}
+// 		user, err = db.GetUser(userID)
+// 	}
+// 	if err != nil {
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		templates.GenerateErrorPage(w, "error getting user")
+// 		zapper.Error("error", zap.Error(err))
+// 		return
+// 	}
+// 	if err = templates.GenerateProfilePage(w, user); err != nil {
+// 		zapper.Error("error", zap.Error(err))
+// 	}
+// }
 
 func pathIntoArray(path string) []string {
 	if path == "" {
@@ -383,4 +428,14 @@ func pathIntoArray(path string) []string {
 		path = path[:len(path)-1]
 	}
 	return strings.Split(path, "/")
+}
+
+// profileFromCtx extracts and returns a templates.Profile struct
+// from a context, ideally a request context.
+func profileFromCtx(c context.Context) templates.Profile {
+	user, ok := c.Value(ContextString("user")).(database.User)
+	return templates.Profile{
+		User: user,
+		OK:   ok,
+	}
 }

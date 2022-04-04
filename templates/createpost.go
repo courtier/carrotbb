@@ -31,7 +31,7 @@ func GenerateCreatePostPage() string {
 	return createPostTemplate
 }
 
-func ServeCreatePostTemplate(w http.ResponseWriter, r *http.Request) {
+func ServeCreatePostTemplate(w http.ResponseWriter) {
 	w.Header().Add("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, createPostTemplate)
 }

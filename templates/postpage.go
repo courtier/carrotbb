@@ -18,8 +18,8 @@ const postPageTemplateStr = `<html lang="en">
 </head>
 
 <body>
-    {{if .SignedIn}}
-    <p><a href="/">carrotbb</a> - logged in as <a href="/self">{{.Username}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
+    {{if .User.OK}}
+    <p><a href="/">carrotbb</a> - logged in as <a href="/self">{{.User.User.Name}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
     {{else}}
     <p><a href="/">carrotbb</a> - <a href="/signup">sign up</a> <a href="/signin">sign in</a></p>
     {{end}}
@@ -34,11 +34,11 @@ const postPageTemplateStr = `<html lang="en">
             <hr>
         {{end}}
 	{{else}}
-	<p><b>no comments found.{{if .SignedIn}} leave one down below!{{end}}</b></p>
+	<p><b>no comments found.{{if .User.OK}} leave one down below!{{end}}</b></p>
 	{{end}}
-    {{if .SignedIn}}
+    {{if .User.OK}}
     <form action="/createcomment" method="post">
-        <label for="comment">Comment</label><br>
+        <label for="comment">Leave a comment</label><br>
 		<input type="hidden" id="postID" name="postID" value="{{.Post.ID}}">
         <textarea rows="7" cols="50" id="comment" name="comment"></textarea><br><br>
         <input type="submit" value="Submit">
@@ -49,8 +49,7 @@ const postPageTemplateStr = `<html lang="en">
 </html>`
 
 type PostPageTemplateData struct {
-	SignedIn bool
-	Username string
+	User     Profile
 	Post     database.Post
 	Poster   database.User
 	Comments []database.Comment
@@ -61,10 +60,9 @@ var (
 	postPageTemplate = template.Must(template.New("postPageTemplate").Parse(postPageTemplateStr))
 )
 
-func GeneratePostPage(w http.ResponseWriter, signedIn bool, name string, post database.Post, poster database.User, comments []database.Comment, users map[xid.ID]database.User) error {
+func GeneratePostPage(w http.ResponseWriter, user Profile, post database.Post, poster database.User, comments []database.Comment, users map[xid.ID]database.User) error {
 	data := PostPageTemplateData{
-		SignedIn: signedIn,
-		Username: name,
+		User:     user,
 		Post:     post,
 		Poster:   poster,
 		Comments: comments,

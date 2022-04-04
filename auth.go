@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -21,8 +22,9 @@ const (
 )
 
 var (
-	ErrSessionNotCached  = errors.New("session not in cache")
-	ErrRandReadUnmatched = errors.New("rand read less bytes than required")
+	ErrSessionNotCached    = errors.New("session token not in cache")
+	ErrExpiredSessionToken = errors.New("session token has expired")
+	ErrRandReadUnmatched   = errors.New("rand read less bytes than required")
 )
 
 type MapCache struct {
@@ -102,56 +104,41 @@ func saltAndHash(initial, salt string) string {
 	return encoded
 }
 
-// extractSession extracts a session token if possible from a request
-// Returns an error if the token is not in the cache
-func extractSession(r *http.Request) (token string, err error) {
+// TODO: these two functions could be done in a better way
+
+// extractSessionToken extracts the session token from the session_token cookie
+// if possible, returns an error if the cookie does not exist.
+// this function does not do any sanitizing/validating, the token string could be anything
+func extractSessionToken(r *http.Request) (string, error) {
 	c, err := r.Cookie("session_token")
+	if err == http.ErrNoCookie {
+		return "", err
+	}
+	return c.Value, err
+}
+
+// extractUser extracts a user from a request using the session_token cookie
+// if the token is in the cache. if it is not it returns ErrSessionNotCached
+// iif the token is cached, but it is expired it returns ErrExpiredSessionToken
+func extractUser(r *http.Request) (token string, user database.User, err error) {
+	token, err = extractSessionToken(r)
 	if err == http.ErrNoCookie {
 		return
 	}
-	token = c.Value
-	_, ok := sessionCache.ReadOK(token)
-	if !ok {
-		err = ErrSessionNotCached
-	}
-	return
-}
-
-// isRequestAuthenticatedSimple simply checks if a request is authenticated
-func isRequestAuthenticatedSimple(r *http.Request) bool {
-	token, err := extractSession(r)
-	if err != nil {
-		return false
-	}
-	return !sessionCache.Read(token).isExpired()
-}
-
-// extractUser extracts the user if authenticated from a request
-func extractUser(r *http.Request) (user database.User, err error) {
-	c, err := r.Cookie("session_token")
-	if err == http.ErrNoCookie {
-		return
-	}
-	token := c.Value
 	sesh, ok := sessionCache.ReadOK(token)
 	if !ok {
 		err = ErrSessionNotCached
 		return
 	}
-	return db.GetUser(sesh.userID)
+	if sesh.isExpired() {
+		err = ErrExpiredSessionToken
+		return
+	}
+	user, err = db.GetUser(sesh.userID)
+	return
 }
 
-// extractUsername returns true and the username of the user if authenticated, false and empty string if not
-func extractUsername(r *http.Request) (bool, string) {
-	var signedIn bool
-	var username string
-	user, err := extractUser(r)
-	if err == nil {
-		signedIn = true
-		username = user.Name
-	}
-	return signedIn, username
-}
+type ContextString string
 
 // AuthMiddleware checks for expired tokens and deletes them if it catches any
 type AuthMiddleware struct {
@@ -163,11 +150,16 @@ func NewAuthMiddleware(handler http.Handler) *AuthMiddleware {
 }
 
 func (a *AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	token, err := extractSession(r)
-	if err == nil && sessionCache.Read(token).isExpired() {
-		unauthenticateUser(w, token)
+	reqCtx := r.Context()
+	token, user, err := extractUser(r)
+	if err != nil {
+		if err == ErrExpiredSessionToken {
+			unauthenticateUser(w, token)
+		}
+	} else {
+		reqCtx = context.WithValue(reqCtx, ContextString("user"), user)
 	}
-	a.handler.ServeHTTP(w, r)
+	a.handler.ServeHTTP(w, r.WithContext(reqCtx))
 }
 
 // authenticateUser puts the token and session in the cache and sets the cookie

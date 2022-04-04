@@ -35,7 +35,11 @@ func TestExtractSession(t *testing.T) {
 		Name:  "session_token",
 		Value: sessionToken,
 	})
-	if token, err := extractSession(r); err != nil || token != sessionToken {
-		t.Error("Expected:", sessionToken, "got:", token)
+	if token, err := extractSessionToken(r); err != nil || token != sessionToken {
+		if err != nil {
+			t.Fatal(err)
+		} else {
+			t.Error("Expected:", sessionToken, "got:", token)
+		}
 	}
 }

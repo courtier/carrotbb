@@ -11,6 +11,9 @@ bulletin board
 ## immediate todos
 - ability to delete posts, comments, accounts
     - deletable users (deleted field, change name to deleted)
+- handle the logging of errors in a single function?
+    - generate error template
+    - zap the error
 
 ## long term todos
 - csrf tokens

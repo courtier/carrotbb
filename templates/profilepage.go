@@ -7,7 +7,7 @@ import (
 	"github.com/courtier/carrotbb/database"
 )
 
-const indexPageTemplateStr = `<html lang="en">
+const profilePageTemplateStr = `<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -17,8 +17,8 @@ const indexPageTemplateStr = `<html lang="en">
 </head>
 
 <body>
-    {{if .User.OK}}
-    <p>carrotbb - logged in as <a href="/self">{{.User.User.Name}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
+    {{if .SignedIn}}
+    <p>carrotbb - logged in as <a href="/self">{{.Username}}</a> <a href="/createpost">create a post</a> <a href="/logout">log out</a></p>
     {{else}}
     <p>carrotbb - <a href="/signup">sign up</a> <a href="/signin">sign in</a></p>
     {{end}}
@@ -38,19 +38,17 @@ const indexPageTemplateStr = `<html lang="en">
 
 </html>`
 
-type IndexPageTemplateData struct {
-	User  Profile
-	Posts []database.Post
+type ProfilePageTemplateData struct {
+	User database.User
 }
 
 var (
-	indexPageTemplate = template.Must(template.New("indexPageTemplate").Parse(indexPageTemplateStr))
+	profilePageTemplate = template.Must(template.New("profilePageTemplate").Parse(profilePageTemplateStr))
 )
 
-func GenerateIndexPage(w http.ResponseWriter, user Profile, posts []database.Post) error {
-	data := IndexPageTemplateData{
-		User:  user,
-		Posts: posts,
+func GenerateProfilePage(w http.ResponseWriter, user database.User) error {
+	data := ProfilePageTemplateData{
+		User: user,
 	}
-	return indexPageTemplate.Execute(w, data)
+	return profilePageTemplate.Execute(w, data)
 }
